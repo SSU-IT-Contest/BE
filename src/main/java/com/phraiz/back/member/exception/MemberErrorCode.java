@@ -14,6 +14,7 @@ public enum MemberErrorCode implements ErrorCode {
     USER_NOT_FOUND(404, "CLT004", "사용자를 찾을 수 없습니다.", "ACCOUNT"),
     USERID_EXISTS(409, "CLT005", "이미 존재하는 ID입니다.", "ACCOUNT"),
     INVALID_MEMBER_ID(400, "CLT006", "아이디는 영문자 또는 숫자 5~20자리여야 합니다.", "ACCOUNT"),
+    SOCIAL_USER_NO_ID(404,"CLT012","소셜 로그인으로 가입된 계정이기 때문에 아이디가 존재하지 않습니다.","ACCOUNT"),
 
     // 03. 인증 코드 관련
     NO_SUCH_ALGORITHM(500, "SYS002", "안전한 랜덤한 값을 생성할 수 없습니다.", "ACCOUNT"),

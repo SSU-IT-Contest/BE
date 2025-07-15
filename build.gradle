@@ -48,6 +48,10 @@ dependencies {
 
 	implementation 'jakarta.mail:jakarta.mail-api:2.1.2'
 	implementation 'com.sun.mail:jakarta.mail:2.0.1' // 구현체
+
+	// csl processor
+	implementation("de.undercouch:citeproc-java:3.0.0-beta.2")
+
 }
 
 tasks.named('test') {

@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Entity
 @Table(name = "member")
@@ -21,7 +22,9 @@ public class Member {
     @Column(name = "member_id", updatable = false)
     private Long memberId; // 멤버 식별자
 
+    @Column(nullable = false)
     private Long planId;
+    // 기본값 0 : free?
 
     @Column(nullable = false, unique = true)
     private String id;
@@ -40,6 +43,7 @@ public class Member {
 
     @Column(nullable = false)
     private String role;
+
 
     @PrePersist
     public void prePersist() {
