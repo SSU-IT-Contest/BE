@@ -1,4 +1,4 @@
-package com.phraiz.back.common.type;
+package com.phraiz.back.common.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

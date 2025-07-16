@@ -27,7 +27,7 @@ public class OpenAIService {
     }
 
     public String callSummaryOpenAI(String text, String mode) {
-        String prompt = String.format(mode, text);
+        String prompt = String.format("%s: %s",mode, text);
         return callOpenAIInternal(prompt, "당신은 문서를 다양한 방식으로 요약하는 전문가입니다.", gptConfig.getTemperatureSummary());
     }
 

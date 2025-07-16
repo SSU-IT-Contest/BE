@@ -1,6 +1,7 @@
 package com.phraiz.back.paraphrase.controller;
 
 import com.phraiz.back.common.security.user.CustomUserDetails;
+import com.phraiz.back.common.util.SecurityUtil;
 import com.phraiz.back.member.domain.Member;
 import com.phraiz.back.paraphrase.dto.request.ParaphraseRequestDTO;
 import com.phraiz.back.paraphrase.dto.response.ParaphraseResponseDTO;
@@ -33,54 +34,58 @@ public class ParaphraseController {
     private final ParaphraseService paraphraseService;
 
     // 1. 모드 별 패러프레이징
+    // 1-1. 표준 모드
     @PostMapping("/paraphrasing/standard")
     public ResponseEntity<?> paraphraseStandard(HttpServletRequest request, HttpServletResponse response,
                                                 @RequestBody ParaphraseRequestDTO dto) {
         // 로그인한 유저의 ID
-//        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-//        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-//        String memberId = authentication.getName(); // 보통 여기서 memberId 반환됨
-        String memberId = "user01";
+        String memberId = SecurityUtil.getCurrentMemberId();
+        //String memberId = "user01";
         ParaphraseResponseDTO result = paraphraseService.paraphraseStandard(memberId, dto);
         return ResponseEntity.ok(result);
     }
 
+    // 1-2. 학술적 모드
     @PostMapping("/paraphrasing/academic")
     public ResponseEntity<?> paraphraseAcademic(HttpServletRequest request, HttpServletResponse response,
                                                 @RequestBody ParaphraseRequestDTO dto) {
-        String memberId = "user01";
+        String memberId = SecurityUtil.getCurrentMemberId();
         ParaphraseResponseDTO result = paraphraseService.paraphraseAcademic(memberId, dto);
         return ResponseEntity.ok(result);
     }
 
+    // 1-3. 창의적 모드
     @PostMapping("/paraphrasing/creative")
     public ResponseEntity<?> paraphraseCreative(HttpServletRequest request, HttpServletResponse response,
                                                 @RequestBody ParaphraseRequestDTO dto) {
-        String memberId = "user01";
+        String memberId = SecurityUtil.getCurrentMemberId();
         ParaphraseResponseDTO result = paraphraseService.paraphraseCreative(memberId, dto);
         return ResponseEntity.ok(result);
     }
 
+    // 1-4. 유창한 모드
     @PostMapping("/paraphrasing/fluency")
     public ResponseEntity<?> paraphraseFluency(HttpServletRequest request, HttpServletResponse response,
                                                @RequestBody ParaphraseRequestDTO dto) {
-        String memberId = "user01";
+        String memberId = SecurityUtil.getCurrentMemberId();
         ParaphraseResponseDTO result = paraphraseService.paraphraseFluency(memberId, dto);
         return ResponseEntity.ok(result);
     }
 
+    // 1-5. 실험적 모드
     @PostMapping("/paraphrasing/experimental")
     public ResponseEntity<?> paraphraseExperimental(HttpServletRequest request, HttpServletResponse response,
                                                     @RequestBody ParaphraseRequestDTO dto) {
-        String memberId = "user01";
+        String memberId = SecurityUtil.getCurrentMemberId();
         ParaphraseResponseDTO result = paraphraseService.paraphraseExperimental(memberId, dto);
         return ResponseEntity.ok(result);
     }
 
+    // 1-6. 사용자 지정 모드
     @PostMapping("/paraphrasing/custom")
     public ResponseEntity<?> paraphraseCustom(HttpServletRequest request, HttpServletResponse response,
                                               @RequestBody ParaphraseRequestDTO dto) {
-        String memberId = "user01";
+        String memberId = SecurityUtil.getCurrentMemberId();
         ParaphraseResponseDTO result = paraphraseService.paraphraseCustom(memberId, dto);
         return ResponseEntity.ok(result);
     }
