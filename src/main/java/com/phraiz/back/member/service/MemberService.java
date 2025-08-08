@@ -1,6 +1,8 @@
 package com.phraiz.back.member.service;
 
 import com.phraiz.back.common.exception.custom.BusinessLogicException;
+import com.phraiz.back.common.exception.custom.InvalidRefreshTokenException;
+import com.phraiz.back.common.exception.custom.RefreshTokenExpiredException;
 import com.phraiz.back.common.security.jwt.JwtUtil;
 import com.phraiz.back.common.util.RedisUtil;
 import com.phraiz.back.member.domain.Member;
@@ -16,20 +18,20 @@ import jakarta.servlet.http.Cookie;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.GetMapping;
 
-import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 
 @Slf4j
 @Service
 public class MemberService {
     @Autowired
-    MemberRepository memberRepository;
+    private MemberRepository memberRepository;
     @Autowired
     private BCryptPasswordEncoder bCryptPasswordEncoder;
     @Autowired
@@ -44,8 +46,13 @@ public class MemberService {
     // token 재발급-RTR 방식으로
     public LoginResponseDTO reissueToken(String refreshToken) {
         // refresh token 유효성 검사
-        if (!jwtUtil.validateToken(refreshToken)) {
-            throw new BusinessLogicException(MemberErrorCode.INVALID_REFRESH_TOKEN);
+//        if (!jwtUtil.validateToken(refreshToken)) {
+//            throw new BusinessLogicException(MemberErrorCode.INVALID_REFRESH_TOKEN);
+//        }
+        try {
+            jwtUtil.validateToken(refreshToken);
+        } catch (JwtException e) {
+            throw new InvalidRefreshTokenException("유효하지 않은 리프레시 토큰입니다.");
         }
 
         String id=jwtUtil.getSubjectFromToken(refreshToken); // 사용자의 고유 아이디
@@ -53,13 +60,13 @@ public class MemberService {
         // redis 에 저장된 refresh 토큰과 일치확인
         String storedRefreshToken=redisTemplate.opsForValue().get("RT:"+id);
 
-        if (storedRefreshToken==null || !storedRefreshToken.equals(refreshToken)) {
-            throw new IllegalArgumentException("저장된 refresh token과 일치하지 않습니다.");
+        if (storedRefreshToken == null || !storedRefreshToken.equals(refreshToken)) {
+            throw new InvalidRefreshTokenException("저장된 refresh token과 일치하지 않습니다.");
         }
         // 새로운 access token 발급
-        String newAccessToken = jwtUtil.generateToken(id);
+        String newAccessToken = jwtUtil.generateAccessToken(id);
         // 새로운 refresh token 발급
-        //String newRefreshToken = jwtUtil.generateToken(id);
+        //String newRefreshToken = jwtUtil.generateAccessToken(id);
 
         // Redis 업데이트: 기존 삭제 후 새로운 것 저장
 //        redisTemplate.delete("RT:"+id);
@@ -122,7 +129,17 @@ public class MemberService {
 
         return new SignUpResponseDTO(member.getMemberId(),"회원가입 성공");
     }
-    // 1-2. 이메일 검증 여부 확인
+
+    // 1-2. 아이디중복 확인
+    public boolean checkId(String id){
+        if (memberRepository.existsById(id)) {
+            throw new BusinessLogicException(MemberErrorCode.USERID_EXISTS);
+        }else {
+            return true;
+        }
+    }
+
+    // 1-3. 이메일 검증 여부 확인
     public void checkEmailVerified(String email) {
         String verified=redisUtil.getData("verified:"+email);
         if (!"true".equals(verified)) {
@@ -142,7 +159,8 @@ public class MemberService {
        return member;
     }
 
-    // 2-3. 이메일 입력 시 이메일로 아이디 전송
+    // 2-3. 아이디 찾기
+    // 등록된 이메일 입력 시 이메일로 아이디 전송
     public void findId(String email) {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> new BusinessLogicException(MemberErrorCode.EMAIL_NOT_REGISTERED));
@@ -165,6 +183,93 @@ public class MemberService {
         }
     }
 
+    // 2-4. 비밀번호 찾기
+    /*
+    * 임시 재설정 토큰(예: UUID or JWT) 하나만 발급 (액세스 토큰 아님)
+
+    이 토큰은: DB 또는 Redis에 저장, 30분 등의 짧은 유효기간 설정
+
+    프론트엔드가 이 토큰을 가지고 새 비밀번호를 입력하게 함, 백엔드는 이 토큰을 검증하고 새 비밀번호를 저장
+
+    * */
+    // 등록된 이메일 입력 시 이메일로 비밀번호 재설정 링크 전송
+    public void findPwd(String email) {
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessLogicException(MemberErrorCode.EMAIL_NOT_REGISTERED));
+        LoginType loginType=member.getLoginType();
+        if (!loginType.equals(LoginType.LOCAL)){
+            throw  new BusinessLogicException(MemberErrorCode.SOCIAL_USER_NO_ID);
+        }
+
+        // 임시 토큰 생성
+        // 1. 재설정용 토큰 생성 (UUID)
+        String token = UUID.randomUUID().toString();
+
+        // 2. Redis에 저장 (30분 만료)
+        redisTemplate.opsForValue().set("PWD_RESET:" + token, member.getId(), 30, TimeUnit.MINUTES);
+
+        // 3. 이메일 링크 생성
+        // String resetLink = "https://ssu-phraiz-fe.vercel.app/reset-pw?token=" + token;
+        // TODO 링크 변경
+        String resetLink = "http://localhost:3000?token=" + token;
+
+        String title = "비밀번호 재설정 안내";
+        String content =
+                "<p>안녕하세요,</p>" + 	//html 형식으로 작성
+                        "<br><br>" +
+                        "아래 링크를 클릭하여 비밀번호를 재설정해주세요. " +
+                        "<br>" +
+                        resetLink +
+                        "<br>" +
+                        "이 링크는 30분간 유효합니다. " +
+                        "<br><br>" ; //이메일 내용 삽입
+
+
+        try {
+            emailService.sendMail(email,title,content,null);
+        } catch (MessagingException e) {
+            throw new RuntimeException("이메일 전송 실패",e);
+        }
+
+    }
+
+    // 비밀번호 재설정 유효성 검사
+    public boolean verifyResetToken(String token) {
+        // 1. Redis에서 토큰 조회
+        String resetId = redisTemplate.opsForValue().get("PWD_RESET:" + token);
+        if (resetId == null) {
+            throw new BusinessLogicException(MemberErrorCode.INVALID_PASSWORD_RESET_TOKEN);
+        }
+
+        // 2. 사용자 조회
+        memberRepository.findById(resetId)
+                .orElseThrow(() -> new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+
+        return true;
+    }
+
+    // 비밀번호 재설정
+    public void resetPwd(String token, String newPwd){
+        // 1. Redis에서 토큰 조회
+        String resetId = redisTemplate.opsForValue().get("PWD_RESET:" + token);
+        if (resetId == null) {
+            throw new BusinessLogicException(MemberErrorCode.INVALID_PASSWORD_RESET_TOKEN);
+        }
+
+        // 2. 사용자 조회
+        Member member = memberRepository.findById(resetId)
+                .orElseThrow(() -> new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+
+        // 3. 비밀번호 암호화 및 저장
+        // 비밀번호 암호화
+        member.setPwd(bCryptPasswordEncoder.encode(newPwd));
+        memberRepository.save(member);
+
+        // 4. 토큰 삭제 (1회성)
+        redisTemplate.delete("PWD_RESET:" + token);
+    }
+
+
     // 3. 회원정보 가져오기
     public LoginResponseDTO getMember(String id, String accessToken) {
         Member member=memberRepository.findById(id)
@@ -176,4 +281,7 @@ public class MemberService {
                 member.getEmail(),
                 member.getRole());
     }
+
+
+
 }

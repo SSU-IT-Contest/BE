@@ -28,13 +28,21 @@ public enum MemberErrorCode implements ErrorCode {
 
     // 05. 비밀번호 관련
     PASSWORD_MISMATCH(401, "CLT011", "비밀번호가 일치하지 않습니다.", "ACCOUNT"),
-    INVALID_PASSWORD(400, "CLT013", "비밀번호는 영문자, 숫자, 특수문자를 포함한 8~20자리여야 합니다.", "ACCOUNT"),
+    INVALID_PASSWORD(400, "CLT013", "비밀번호는 영문, 숫자, 특수문자를 포함한 8~20자여야 합니다.", "ACCOUNT"),
 
     // 06. 엑세스 토큰 재발급 관련
     MISSING_REFRESH_TOKEN(401, "SEC001", "Refresh Token이 존재하지 않습니다.", "ACCOUNT"),
     MISSING_ACCESS_TOKEN(401, "SEC002", "Access Token이 필요합니다.", "ACCOUNT"),
     INVALID_ACCESS_TOKEN(401, "SEC003", "Access Token이 유효하지 않습니다.", "ACCOUNT"),
-    INVALID_REFRESH_TOKEN(401, "SEC004", "유효하지 않은 Refresh Token입니다.", "ACCOUNT")
+    INVALID_REFRESH_TOKEN(401, "SEC004", "유효하지 않은 Refresh Token입니다.", "ACCOUNT"),
+
+    // 07. 비밀번호 재설정 토큰 발급 관련
+    INVALID_PASSWORD_RESET_TOKEN(401, "SEC005", "비밀번호 재설정 토큰이 유효하지 않거나 만료되었습니다.", "ACCOUNT"),
+
+    // 08. 요금제 관련
+    PLAN_NOT_ENOUGH(403, "PLAN001", "BASIC 플랜 이상에서만 폴더 기능을 사용할 수 있습니다.", "PLAN");
+
+
     ;
 
     private final int status;

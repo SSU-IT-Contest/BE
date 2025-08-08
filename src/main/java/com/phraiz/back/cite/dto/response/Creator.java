@@ -1,4 +1,4 @@
-package com.phraiz.back.member.dto.response.cite;
+package com.phraiz.back.cite.dto.response;
 
 import lombok.Data;
 
@@ -7,4 +7,6 @@ public class Creator {
     private String firstName;
     private String lastName;
     private String creatorType;
+
+
 }

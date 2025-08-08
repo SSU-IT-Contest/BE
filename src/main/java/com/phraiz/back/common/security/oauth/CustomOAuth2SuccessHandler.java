@@ -32,7 +32,7 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
 
         // 토큰 발급 //
         // 토큰 생성
-        String accessToken = jwtUtil.generateToken(id);
+        String accessToken = jwtUtil.generateAccessToken(id);
         String refreshToken = jwtUtil.generateRefreshToken(id);
 
         // refresh token redis에 저장
@@ -48,7 +48,6 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
         refreshTokenCookie.setPath("/");
         refreshTokenCookie.setMaxAge((int) (jwtUtil.getRefreshTokenExpTime() / 1000));
 
-        // TODO
         // 임시 토큰 만들기
         String tempToken = UUID.randomUUID().toString();
         // Redis에 저장 (userId → tempCode or tempCode → userId)

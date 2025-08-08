@@ -55,7 +55,7 @@ public class KakaoOAuthService {
 //
 //        // 3. 회원 등록 or 로그인 처리
 //        Member member = findOrCreateMember(email, id);
-//        String newAccessToken = jwtUtil.generateToken(member.getId());
+//        String newAccessToken = jwtUtil.generateAccessToken(member.getId());
 //                String newRefreshToken = jwtUtil.generateRefreshToken(member.getId());
 //
 //        // 4. Redis, 쿠키 저장 등 처리 (생략 가능)
