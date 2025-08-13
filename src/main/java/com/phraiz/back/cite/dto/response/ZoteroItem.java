@@ -1,4 +1,4 @@
-package com.phraiz.back.member.dto.response.cite;
+package com.phraiz.back.cite.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -4,7 +4,6 @@ import com.phraiz.back.common.security.jwt.JwtUtil;
 import com.phraiz.back.member.dto.response.LoginResponseDTO;
 import com.phraiz.back.member.service.MemberService;
 import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +37,7 @@ public class OauthController {
         redisTemplate.delete(tempToken);
 
         // Access/Refresh Token 생성
-        String accessToken = jwtUtil.generateToken(id);
+        String accessToken = jwtUtil.generateAccessToken(id);
         String refreshToken = jwtUtil.generateRefreshToken(id);
 
         // refresh token redis에 저장

@@ -27,6 +27,8 @@ import java.util.Random;
 @Slf4j
 // 인증코드 생성하고 이메일 보내는 서비스
 public class EmailService {
+    private static final String AUTH_KEY_PREFIX = "auth:";
+    private static final String VERIFIED_KEY_PREFIX = "verified:";
     private final JavaMailSender emailSender;
     private final RedisUtil redisUtil;
     private final MemberRepository memberRepository;
@@ -71,25 +73,42 @@ public class EmailService {
         }
         if (authNum != null) {
             // Redis에 인증번호 저장-검증을 위함
-            redisUtil.setDataExpire(authNum,to,60*5L);
+            // 이메일이 key, 인증번호가 value
+            String redisKey = AUTH_KEY_PREFIX + to; // "auth:user@example.com"
+            redisUtil.setDataExpire(redisKey, authNum, 60*5L);
+
         }
 
 
     }
     // 사용자가 입력한 인증 번호와 실제 인증 번호 비교
     public boolean checkAuthNum(String email, String authNum) {
-        String data = redisUtil.getData(authNum); // 인증번호로 이메일 꺼내기
-        if (data != null && data.equals(email)){
-            // 인증 성공 이후, 인증된 이메일임을 표시
-            redisUtil.setDataExpire("verified:" + email, "true", 300);
+        String redisKey = AUTH_KEY_PREFIX + email;
+        String storedAuthNum = redisUtil.getData(redisKey);
+        // 저장된 인증번호가 없음 (만료되었거나 발급되지 않음)
+        if (storedAuthNum == null) {
+            //log.warn("인증번호 검증 실패: 저장된 인증번호 없음, email={}", email);
+            throw new BusinessLogicException(MemberErrorCode.VERIFICATION_CODE_EXPIRED);
+        }
+        // 입력된 인증번호와 저장된 인증번호 비교
+        if (storedAuthNum.equals(authNum)) { // 인증 성공
+            // 1. 사용된 인증번호 삭제
+            redisUtil.deleteData(redisKey);
+            // 2. 인증 완료 표시
+            String verifiedKey = VERIFIED_KEY_PREFIX + email;
+            //redisUtil.setDataExpire(verifiedKey, "true", 60*15L); // 인증 완료 후 제한 시간
+            redisUtil.setData(verifiedKey, "true"); // 인증 완료 후 제한 시간x
             return true;
         }else {
-            return false;
+            // 인증번호 검사 실패
+            throw new BusinessLogicException(MemberErrorCode.WRONG_VERIFICATION_CODE);
         }
+
     }
     // 이메일로 사용자 찾기 존재->true
     public boolean getMemberByEmail(String email) {
         // 등록된 이메일인지 확인
         return memberRepository.existsByEmail(email);
     }
+
 }

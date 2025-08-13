@@ -1,6 +1,6 @@
-package com.phraiz.back.member.service;
+package com.phraiz.back.cite.service;
 
-import com.phraiz.back.member.dto.response.cite.ZoteroItem;
+import com.phraiz.back.cite.dto.response.ZoteroItem;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;

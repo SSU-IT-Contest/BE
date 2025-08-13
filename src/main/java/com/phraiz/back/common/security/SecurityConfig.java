@@ -62,12 +62,14 @@ public class SecurityConfig {
                 }))
                 .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorizeRequests ->authorizeRequests
-                        // TODO 인증 없이 접근 허용한 부분?
-                        .requestMatchers("/api/members/reissue","/api/members/signUp","/api/members/login","/api/members/findId",
+                        // TODO 인증 없이 접근 허용한 부분
+                        .requestMatchers("/api/members/reissue","/api/members/signUp","/api/members/login","/api/members/findId", "/api/members/findPwd","/api/members/verifyResetToken","/api/members/resetPwd", "/api/members/checkId",
                                 "/api/members/emails/**", "/api/oauth/token",
                                 "/api/cite/**",
-                                "/api/paraphrase/**", "/api/summary/**").permitAll()
+                                "/api/paraphrase/**", "/api/summary/**",
+                                "/oauth2/**").permitAll()
 
+                        // .requestMatchers("/api/cite/**").authenticated()  //  로그인 필수
                         .requestMatchers("/api/members/logout").authenticated()
                         .anyRequest().authenticated()
                 )

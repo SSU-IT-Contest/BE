@@ -60,20 +60,30 @@ public class MemberController {
     /* 1. 회원가입 */
     // 1-1. 회원 가입(+아이디,이메일 중복 체크)
     @PostMapping("/signUp")
-    public ResponseEntity<SignUpResponseDTO> signUp(@RequestBody SignUpRequestDTO signUpRequestDTO) {
+    public ResponseEntity<SignUpResponseDTO> signUp(@RequestBody @Valid SignUpRequestDTO signUpRequestDTO) {
         //memberService.checkEmailVerified(signUpRequestDTO.getEmail());
         SignUpResponseDTO signUpResponseDTO = memberService.signUp(signUpRequestDTO);
         return ResponseEntity.ok(signUpResponseDTO);
     }
 
-    // 1-2. 이메일 인증 번호 전송&인증
+    // 1-2. 아이디중복 확인
+    @PostMapping("/checkId")
+    public ResponseEntity<Map<String, Object>> checkId(@RequestBody Map<String, String> request) {
+        String id = request.get("id");
+        boolean result=memberService.checkId(id);
+        Map<String, Object> response = new HashMap<>();
+        response.put("result",result);
+        response.put("message", "사용 가능한 아이디입니다.");
+        return ResponseEntity.ok(response);
+    }
+
+    // 1-3. 이메일 인증 번호 전송&인증
     @PostMapping("/emails/mailSend")
     public ResponseEntity<Map<String, Object>> sendEmail(@RequestBody EmailRequestDTO emailRequestDTO) {
         if (emailService.getMemberByEmail(emailRequestDTO.getEmail())){
             throw new BusinessLogicException(MemberErrorCode.DUPLICATE_EMAIL);
         }
         Map<String, Object> response = new HashMap<>();
-        System.out.println("이메일 인증 요청이 들어옴");
         System.out.println("이메일 인증이메일: "+emailRequestDTO.getEmail());
         try {
             emailService.joinEmail(emailRequestDTO.getEmail());
@@ -86,7 +96,7 @@ public class MemberController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-    // 1-2. 인증코드 확인
+    // 1-3. 인증코드 확인
     @PostMapping("/emails/mailAuthCheck")
     public ResponseEntity<Map<String, Object>> authCheck(@RequestBody @Valid EmailCheckDTO emailCheckDTO) {
         boolean check=emailService.checkAuthNum(emailCheckDTO.getEmail(),emailCheckDTO.getAuthNum());
@@ -108,7 +118,7 @@ public class MemberController {
         Member member = memberService.login(loginRequestDTO);
 
         // 토큰 생성
-        String accessToken = jwtUtil.generateToken(member.getId());
+        String accessToken = jwtUtil.generateAccessToken(member.getId());
         String refreshToken = jwtUtil.generateRefreshToken(member.getId());
 
         // refresh token redis에 저장
@@ -164,7 +174,8 @@ public class MemberController {
 
     }
 
-    // 2-3. 이메일 입력 시 이메일로 아이디 전송
+    // 2-3. 아이디 찾기
+    // 등록된 이메일 입력 시 이메일로 아이디 전송
     @PostMapping("/findId")
     public ResponseEntity<Map<String, Object>> findId(@RequestBody Map<String, String> request) {
         String email = request.get("email");
@@ -172,6 +183,51 @@ public class MemberController {
         memberService.findId(email);
         response.put("success", true);
         response.put("message", "입력하신 이메일로 아이디를 전송했습니다.");
+        return ResponseEntity.ok(response);
+    }
+
+    // 2-4. 비밀번호 찾기
+    // 등록된 이메일 입력 시 이메일로 비밀번호 재설정 링크 전송
+    // 임시 토큰 발급 및 이메일 전송
+    @PostMapping("/findPwd")
+    public ResponseEntity<Map<String, Object>> findPwd(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        Map<String, Object> response = new HashMap<>();
+        memberService.findPwd(email);
+        response.put("success", true);
+        response.put("message", "비밀번호 재설정 링크가 이메일로 전송되었습니다.");
+        return ResponseEntity.ok(response);
+    }
+
+    // 비밀번호 재설정 유효성 검사
+    @GetMapping("/verifyResetToken")
+    public ResponseEntity<Map<String, Object>> verifyResetToken(@RequestParam String token) {
+        boolean isValid = memberService.verifyResetToken(token);
+        Map<String, Object> response = new HashMap<>();
+        if (isValid) {
+            response.put("success", true);
+            response.put("message", "유효한 토큰입니다.");
+            return ResponseEntity.ok(response);
+        } else {
+            response.put("success", false);
+            response.put("message", "토큰이 유효하지 않거나 만료되었습니다.");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+    }
+    // 비밀번호 재설정
+    @PostMapping("/resetPwd")
+    public ResponseEntity<Map<String, Object>> resetPwd(@RequestBody Map<String, String> request) {
+        String token = request.get("token");
+        String newPwd = request.get("newPwd");
+
+        if (!newPwd.matches("^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()_+=-]).{8,20}$")) {
+            throw new BusinessLogicException(MemberErrorCode.INVALID_PASSWORD);
+        }
+
+        memberService.resetPwd(token, newPwd);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "비밀번호가 성공적으로 변경되었습니다.");
         return ResponseEntity.ok(response);
     }
 
