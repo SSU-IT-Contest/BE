@@ -12,6 +12,7 @@ import com.phraiz.back.cite.service.CiteTranslationService;
 import com.phraiz.back.common.security.user.CustomUserDetails;
 import com.phraiz.back.member.domain.Member;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import net.minidev.json.JSONObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,6 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/cite")
 @AllArgsConstructor
+@Slf4j
 public class CiteController {
     private final CiteConvertService citeConvertService;
     private final CiteTranslationService citeTranslationService;
@@ -39,15 +41,20 @@ public class CiteController {
         String url=request.get("url");
 
         // 1. URL 을 Zotero Translation Server 에 보내서 논문 등의 메타데이터를 가져옴
+        log.info("[getUrlData] Zotero Translation Server 호출 시작");
         ZoteroItem item = citeTranslationService.translateFromUrl(url);
+        log.info("[getUrlData] Zotero Translation Server 응답 완료: item_title={}", item.getTitle());
 
         // 2. cslJson 으로 변환
+        log.info("[getUrlData] CSL 변환 시작");
         JSONObject cslJson=citeConvertService.toCSL(item);
         String csl=cslJson.toString();
+        log.info("[getUrlData] CSL 변환 완료");
 
         // 3. cslJson & url 저장
         // 응답으로 식별자도 리턴
         Long citeId=citeService.saveCslJson(csl,url,member);
+        log.info("[getUrlData] DB 저장 완료: citeId={}", citeId);
 
         response.put("csl", cslJson);
         response.put("citeId",citeId);
@@ -63,6 +70,7 @@ public class CiteController {
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("message", "인용문 저장 완료");
+        log.info("[getCitation] 인용문 저장 완료");
         return ResponseEntity.ok(response);
     }
 
@@ -123,6 +131,11 @@ public class CiteController {
 
     }
     // 3-2. 폴더에 파일 저장
+//    @PostMapping("/folder/putFile")
+//    public ResponseEntity<Map<String, Object>> putFile(@RequestBody Map<String, String> request, @AuthenticationPrincipal CustomUserDetails userDetails){
+//        Member member = userDetails.getMember();
+//        String folderName = request.get("folderName");
+//    }
     // 3-3. 사용자별 저장된 폴더 조회
     @GetMapping("/folder/getMyFolders")
     public ResponseEntity<List<FolderResponseDTO>> getMyFolders(@AuthenticationPrincipal CustomUserDetails userDetails) {
