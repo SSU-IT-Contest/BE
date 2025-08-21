@@ -1,5 +1,6 @@
 package com.phraiz.back.summary.service;
 
+import com.phraiz.back.common.dto.response.HistoryMetaDTO;
 import com.phraiz.back.common.exception.custom.BusinessLogicException;
 import com.phraiz.back.common.service.OpenAIService;
 import com.phraiz.back.common.service.RedisService;
@@ -8,14 +9,12 @@ import com.phraiz.back.common.util.GptTokenUtil;
 import com.phraiz.back.member.domain.Member;
 import com.phraiz.back.member.exception.MemberErrorCode;
 import com.phraiz.back.member.repository.MemberRepository;
-import com.phraiz.back.paraphrase.exception.ParaphraseErrorCode;
 import com.phraiz.back.summary.dto.request.SummaryRequestDTO;
 import com.phraiz.back.summary.dto.response.SummaryResponseDTO;
 import com.phraiz.back.summary.enums.SummaryPrompt;
 import com.phraiz.back.summary.exception.SummaryErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,25 +28,37 @@ public class SummaryService {
 
     private final OpenAIService openAIService;
     private final RedisService redisService;
+    private final SummaryHistoryService summaryHistoryService;
     private final MemberRepository memberRepository;
 
     public SummaryResponseDTO oneLineSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
-        return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.ONE_LINE.getPrompt());
+        return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.ONE_LINE.getPrompt(),
+                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId());
     }
 
     public SummaryResponseDTO fullSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
-        return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.FULL.getPrompt());
+        return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.FULL.getPrompt(),
+                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId());
     }
 
     public SummaryResponseDTO paragraphSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
-        return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.PARAGRAPH.getPrompt());
+        return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.PARAGRAPH.getPrompt(),
+                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId());
     }
 
     public SummaryResponseDTO keyPointSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
-        return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.KEY_POINT.getPrompt());
+        return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.KEY_POINT.getPrompt(),
+                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId());
     }
 
     public SummaryResponseDTO questionBasedSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
+        // free 요금제 사용자는 사용 불가능
+        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Plan userPlan = Plan.fromId(member.getPlanId());
+        if(userPlan == Plan.FREE){
+            throw new BusinessLogicException(SummaryErrorCode.PLAN_NOT_ACCESSED);
+        }
+
         // question 값 추출
         String question = summaryRequestDTO.getQuestion();
         if(question == null){
@@ -55,10 +66,17 @@ public class SummaryService {
         }
         // 프롬프트에 삽입
         String prompt = String.format(SummaryPrompt.QUESTION_BASED.getPrompt(), question);
-        return summary(memberId, summaryRequestDTO.getText(), prompt);
+        return summary(memberId, summaryRequestDTO.getText(), prompt,
+                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId());
     }
 
     public SummaryResponseDTO targetedSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
+        // free 요금제 사용자는 사용 불가능
+        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Plan userPlan = Plan.fromId(member.getPlanId());
+        if(userPlan == Plan.FREE){
+            throw new BusinessLogicException(SummaryErrorCode.PLAN_NOT_ACCESSED);
+        }
         // target 값 추출
         String target = summaryRequestDTO.getTarget();
         if(target == null){
@@ -66,11 +84,16 @@ public class SummaryService {
         }
         // 프롬프트에 삽입
         String prompt = String.format(SummaryPrompt.TARGETED.getPrompt(), target);
-        return summary(memberId, summaryRequestDTO.getText(), prompt);
+        return summary(memberId, summaryRequestDTO.getText(), prompt,
+                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId());
     }
 
     // 1. 요약 메서드
-    private SummaryResponseDTO summary(String memberId, String summarizeRequestedText, String summarizeMode){
+    private SummaryResponseDTO summary(String memberId,
+                                       String summarizeRequestedText,
+                                       String summarizeMode,
+                                       Long folderId,
+                                       Long historyId){
 
         // 1. 로그인한 멤버 정보 가져오기 - 멤버의 요금제 정보
         Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
@@ -78,22 +101,34 @@ public class SummaryService {
         // 2. 요금제 정책에 따라 다음 로직 분기
         // 2-1. 남은 월 토큰 확인 (DB나 Redis에서 누적 사용량 조회)
         Plan userPlan = Plan.fromId(member.getPlanId());
-        validateRemainingMonthlyTokens(memberId, userPlan, summarizeRequestedText);
+        if(userPlan != Plan.PRO){
+            validateRemainingMonthlyTokens(memberId, userPlan, summarizeRequestedText);
+        }
 
         // 3. 요약 처리 (service 호출)
         String result = openAIService.callSummaryOpenAI(summarizeRequestedText, summarizeMode);
 
-        /**
-         * Todo. 히스토리 업데이트
-         */
         // 4. 내용 저장 (히스토리 업데이트)
+        // 4. 내용 저장 (히스토리 업데이트)
+        HistoryMetaDTO metaDTO = summaryHistoryService.saveOrUpdateHistory(  // ★
+                memberId,
+                folderId,      // 루트면 null
+                historyId,
+                result      // content
+        );
 
         // 5. 사용량 업데이트
         //    - 월 토큰 사용량 증가
+        /**
+         * Todo. 사용량 table 생성 후 저장
+         */
         redisService.incrementMonthlyUsage(memberId, YearMonth.now().toString(), GptTokenUtil.estimateTokenCount(summarizeRequestedText));
 
         // 6. result return
-        SummaryResponseDTO responseDTO = SummaryResponseDTO.builder().result(result).build();
+        SummaryResponseDTO responseDTO = SummaryResponseDTO.builder()
+                .historyId(metaDTO.id())
+                .name(metaDTO.name())
+                .result(result).build();
         return responseDTO;
     }
 
