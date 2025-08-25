@@ -4,8 +4,8 @@ server:
 spring:
   datasource:
     url: ${DEV_DB_URL:jdbc:mysql://localhost:3306/phraiz}
-    username: ${DEV_DB_USERNAME:root}
-    password: ${DEV_DB_PASSWORD:root}
+    username: ${DEV_DB_USERNAME}
+    password: ${DEV_DB_PASSWORD}
 
   redis:
     host: ${REDIS_HOST:localhost}

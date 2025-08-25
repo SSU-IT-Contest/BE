@@ -6,6 +6,7 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+// cite 테이블은 인용문의 원본 데이터를 관리
 @Entity
 @Table(name = "cite")
 @Data
