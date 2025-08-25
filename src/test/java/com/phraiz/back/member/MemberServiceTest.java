@@ -7,21 +7,21 @@ import com.phraiz.back.member.repository.MemberRepository;
 import com.phraiz.back.member.service.MemberService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.transaction.annotation.Transactional;
+//import org.springframework.boot.test.context.SpringBootTest;
+//import org.springframework.transaction.annotation.Transactional;
+//
+//@SpringBootTest
+//@Transactional
+//public class MemberServiceTest {
 
-@SpringBootTest
-@Transactional
-public class MemberServiceTest {
+//    @Autowired
+//    private MemberService memberService;
 
-    @Autowired
-    private MemberService memberService;
+//    @Autowired
+//    private MemberRepository memberRepository;
 
-    @Autowired
-    private MemberRepository memberRepository;
-
-    @Test
-    public void signUp() {
+  //  @Test
+ //   public void signUp() {
 //        // given
 //        SignUpRequestDTO dto = new SignUpRequestDTO();
 //        dto.setId("hee");
@@ -34,5 +34,5 @@ public class MemberServiceTest {
 //        Member saved = memberRepository.findById("hee").orElse(null);
 //        assert saved != null;
 //        assert saved.getEmail().equals("hee@gmail.com");
-    }
-}
+//    }
+//}

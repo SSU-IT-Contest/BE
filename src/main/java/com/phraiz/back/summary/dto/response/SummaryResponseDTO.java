@@ -7,6 +7,8 @@ import lombok.Data;
 @Data
 public class SummaryResponseDTO {
 
+    Long historyId;
+    String name;
     String result;
 
 }

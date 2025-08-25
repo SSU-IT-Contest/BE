@@ -1,5 +1,6 @@
 package com.phraiz.back.paraphrase.service;
 
+import com.phraiz.back.common.dto.response.HistoryMetaDTO;
 import com.phraiz.back.common.exception.custom.BusinessLogicException;
 import com.phraiz.back.common.service.OpenAIService;
 import com.phraiz.back.common.service.RedisService;
@@ -12,6 +13,7 @@ import com.phraiz.back.paraphrase.dto.request.ParaphraseRequestDTO;
 import com.phraiz.back.paraphrase.dto.response.ParaphraseResponseDTO;
 import com.phraiz.back.paraphrase.enums.ParaphrasePrompt;
 import com.phraiz.back.paraphrase.exception.ParaphraseErrorCode;
+import com.phraiz.back.summary.exception.SummaryErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -28,35 +30,52 @@ public class ParaphraseService {
 
     private final OpenAIService openAIService;
     private final RedisService redisService;
+    private final ParaphraseHistoryService paraphraseHistoryService;
     private final MemberRepository memberRepository;
 
     public ParaphraseResponseDTO paraphraseStandard(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
-        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.STANDARD.getPrompt());
+        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.STANDARD.getPrompt(),
+                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
     }
     public ParaphraseResponseDTO paraphraseAcademic(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
-        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.ACADEMIC.getPrompt());
+        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.ACADEMIC.getPrompt(),
+                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
     }
     public ParaphraseResponseDTO paraphraseCreative(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
-        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.CREATIVE.getPrompt());
+        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.CREATIVE.getPrompt(),
+                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
     }
     public ParaphraseResponseDTO paraphraseFluency(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
-        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.FLUENCY.getPrompt());
+        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.FLUENCY.getPrompt(), paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
     }
     public ParaphraseResponseDTO paraphraseExperimental(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
-        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.EXPERIMENTAL.getPrompt());
+        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.EXPERIMENTAL.getPrompt(),
+                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
     }
     public ParaphraseResponseDTO paraphraseCustom(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
+        // free 요금제 사용자는 사용 불가능
+        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Plan userPlan = Plan.fromId(member.getPlanId());
+        if(userPlan == Plan.FREE){
+            throw new BusinessLogicException(SummaryErrorCode.PLAN_NOT_ACCESSED);
+        }
+
         // target 값 추출
         String paraphraseMode = paraphraseRequestDTO.getUserRequestMode();
         if(paraphraseMode == null){
             throw new BusinessLogicException(ParaphraseErrorCode.INVALID_INPUT);
         }
-        return paraphrase(memberId, paraphraseRequestDTO.getText(), paraphraseMode);
+        return paraphrase(memberId, paraphraseRequestDTO.getText(), paraphraseMode,
+                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
     }
 
 
         // 1. paraphrase 메서드
-    private ParaphraseResponseDTO paraphrase(String memberId, String paraphraseRequestedText, String paraphraseMode){
+    private ParaphraseResponseDTO paraphrase(String memberId,
+                                             String paraphraseRequestedText,
+                                             String paraphraseMode,
+                                             Long folderId,
+                                             Long historyId){
 
         // 1. 로그인한 멤버 정보 가져오기 - 멤버의 요금제 정보
         Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
@@ -64,22 +83,31 @@ public class ParaphraseService {
         // 2. 요금제 정책에 따라 다음 로직 분기
         // 2-1. 남은 월 토큰 확인 (DB나 Redis에서 누적 사용량 조회)
         Plan userPlan = Plan.fromId(member.getPlanId());
-        validateRemainingMonthlyTokens(memberId, userPlan, paraphraseRequestedText);
+        if(userPlan != Plan.PRO){
+            validateRemainingMonthlyTokens(memberId, userPlan, paraphraseRequestedText);
+        }
 
         // 3. paraphrase 처리 (service 호출)
         String result = openAIService.callParaphraseOpenAI(paraphraseRequestedText, paraphraseMode);
 
-        /**
-         * Todo. 히스토리 업데이트
-         */
         // 4. 내용 저장 (히스토리 업데이트)
+        HistoryMetaDTO metaDTO = paraphraseHistoryService.saveOrUpdateHistory(  // ★
+                memberId,
+                folderId,      // 루트면 null
+                historyId,
+                result      // content
+        );
 
         // 5. 사용량 업데이트
         //    - 월 토큰 사용량 증가
         redisService.incrementMonthlyUsage(memberId, YearMonth.now().toString(), GptTokenUtil.estimateTokenCount(paraphraseRequestedText));
 
         // 6. result return
-        ParaphraseResponseDTO responseDTO = ParaphraseResponseDTO.builder().result(result).build();
+        ParaphraseResponseDTO responseDTO = ParaphraseResponseDTO.builder()
+                .resultHistoryId(metaDTO.id())
+                .name(metaDTO.name())
+                .result(result)
+                .build();
         return responseDTO;
     }
 
