@@ -20,7 +20,7 @@ public class CiteTranslationService {
        this.restTemplate = new RestTemplate();
    }
     public ZoteroItem translateFromUrl(String url) {
-        String zoteroUrl = "http://localhost:1969/web";
+        String zoteroUrl = "http://translation-server:1969/web";
 
         // 요청 헤더 구성
         HttpHeaders headers = new HttpHeaders();
