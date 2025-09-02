@@ -19,7 +19,7 @@ public class KissAuthorParser {
             Document doc = Jsoup.connect(url).get();
 
             // 저자 이름이 담긴 div.author 태그를 찾음
-            Element authorElement = doc.select("div.author.mb-1").first();
+            Element authorElement = doc.select("di v.author.mb-1").first();
 
             if (authorElement != null) {
                 String fullText = authorElement.text();
