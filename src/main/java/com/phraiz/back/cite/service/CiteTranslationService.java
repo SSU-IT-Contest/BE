@@ -1,6 +1,7 @@
 package com.phraiz.back.cite.service;
 
 import com.phraiz.back.cite.dto.response.ZoteroItem;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -14,13 +15,15 @@ import java.util.UUID;
 
 @Service
 public class CiteTranslationService {
+    @Value("${zotero.url}")
+    private String zoteroUrl;
    private final RestTemplate restTemplate;
 
    public CiteTranslationService() {
        this.restTemplate = new RestTemplate();
    }
     public ZoteroItem translateFromUrl(String url) {
-        String zoteroUrl = "http://localhost:1969/web";
+        //String zoteroUrl = "http://localhost:1969/web";
 
         // 요청 헤더 구성
         HttpHeaders headers = new HttpHeaders();
