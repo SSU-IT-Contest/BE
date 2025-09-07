@@ -19,4 +19,6 @@ public class CitationResponseDTO {
     private String citation;     // 생성된 인용문 텍스트
     private String url;          // 원본 논문 URL
     private LocalDateTime createdAt; // 생성 시각 (정렬/표시용)
+
+    private String cslJson;
 }

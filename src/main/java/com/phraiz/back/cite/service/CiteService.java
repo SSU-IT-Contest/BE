@@ -83,6 +83,7 @@ public class CiteService {
                 .citation(cite.getCitation())
                 .url(cite.getUrl())
                 .createdAt(cite.getCreatedAt())
+                .cslJson(cite.getCslJson())
                 .build();
 
     }
