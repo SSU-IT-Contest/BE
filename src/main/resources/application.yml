@@ -49,3 +49,6 @@ openai:
     paraphrase: 0.3
     summary: 0.7
   max-tokens: 500
+
+zotero:
+  url: ${ZOTERO_URL:http://localhost:1969/web}
