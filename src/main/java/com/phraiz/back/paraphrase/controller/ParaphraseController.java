@@ -1,21 +1,26 @@
 package com.phraiz.back.paraphrase.controller;
 
+import com.phraiz.back.common.dto.request.HistoryUpdateDTO;
+import com.phraiz.back.common.dto.request.UpdateRequestDTO;
+import com.phraiz.back.common.dto.response.FoldersResponseDTO;
+import com.phraiz.back.common.dto.response.HistoriesResponseDTO;
+import com.phraiz.back.common.dto.response.HistoryContentResponseDTO;
 import com.phraiz.back.common.security.user.CustomUserDetails;
 import com.phraiz.back.common.util.SecurityUtil;
 import com.phraiz.back.member.domain.Member;
 import com.phraiz.back.paraphrase.dto.request.ParaphraseRequestDTO;
 import com.phraiz.back.paraphrase.dto.response.ParaphraseResponseDTO;
+import com.phraiz.back.paraphrase.service.ParaphraseFolderService;
+import com.phraiz.back.paraphrase.service.ParaphraseHistoryService;
 import com.phraiz.back.paraphrase.service.ParaphraseService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -32,6 +37,8 @@ public class ParaphraseController {
      */
 
     private final ParaphraseService paraphraseService;
+    private final ParaphraseHistoryService paraphraseHistoryService;
+    private final ParaphraseFolderService paraphraseFolderService;
 
     // 1. 모드 별 패러프레이징
     // 1-1. 표준 모드
@@ -88,6 +95,89 @@ public class ParaphraseController {
         String memberId = SecurityUtil.getCurrentMemberId();
         ParaphraseResponseDTO result = paraphraseService.paraphraseCustom(memberId, dto);
         return ResponseEntity.ok(result);
+    }
+
+
+    /* ---------- 2. 폴더 ---------- */
+
+    // 2-1. 폴더 목록 (page,size optional)
+    @GetMapping("/folders")
+    public Page<FoldersResponseDTO> getFolders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        String memberId = SecurityUtil.getCurrentMemberId();
+        return paraphraseFolderService.getFolders(memberId, page, size);
+    }
+
+    // 2-2. 폴더 생성
+    @PostMapping("/folders")
+    public ResponseEntity<Void> createFolder(@RequestBody UpdateRequestDTO dto) {
+        String memberId = SecurityUtil.getCurrentMemberId();
+        paraphraseFolderService.createFolder(memberId, dto.name());
+        return ResponseEntity.ok().build();
+    }
+
+    // 2-3. 폴더 이름 수정
+    @PatchMapping("/folders/{folderId}")
+    public ResponseEntity<Void> renameFolder(@PathVariable Long folderId,
+                                             @RequestBody UpdateRequestDTO dto) {
+        String memberId = SecurityUtil.getCurrentMemberId();
+        paraphraseFolderService.renameFolder(memberId, folderId, dto.name());
+        return ResponseEntity.ok().build();
+    }
+
+    // 2-4. 폴더 삭제
+    @DeleteMapping("/folders/{folderId}")
+    public ResponseEntity<Void> deleteFolder(@PathVariable Long folderId) {
+        String memberId = SecurityUtil.getCurrentMemberId();
+        paraphraseFolderService.deleteFolder(memberId, folderId);
+        return ResponseEntity.ok().build();
+    }
+
+    /* ---------- 3. 히스토리 ---------- */
+
+    // 3-1. 히스토리 목록 (page,size optional)
+    @GetMapping("/histories")
+    public Page<HistoriesResponseDTO> getHistories(@RequestParam(required = false) Long folderId,
+                                                   @RequestParam(defaultValue = "0") int page,
+                                                   @RequestParam(defaultValue = "5") int size) {
+
+        String memberId = SecurityUtil.getCurrentMemberId();
+        return paraphraseHistoryService.getHistories(memberId, folderId, page, size);
+    }
+
+    // 3-2. 히스토리 생성
+    @PostMapping("/histories")
+    public ResponseEntity<Void> createHistory(@RequestParam(required = false) Long folderId,
+                                              @RequestBody UpdateRequestDTO dto) {
+        String memberId = SecurityUtil.getCurrentMemberId();
+        paraphraseHistoryService.createHistory(memberId, folderId, dto.name());
+        return ResponseEntity.ok().build();
+    }
+
+    // 3-3. 히스토리 이동 및 이름 수정(폴더 변경) -- PATCH 하나로 처리
+    @PatchMapping("/histories/{historyId}")
+    public ResponseEntity<Void> updateHistory(@PathVariable Long historyId,
+                                              @RequestBody HistoryUpdateDTO dto) {
+        String memberId = SecurityUtil.getCurrentMemberId();
+        paraphraseHistoryService.updateHistory(memberId, historyId, dto);
+        return ResponseEntity.ok().build();
+    }
+
+    // 3-4. 히스토리 삭제
+    @DeleteMapping("/histories/{historyId}")
+    public ResponseEntity<Void> deleteHistory(@PathVariable Long historyId) {
+        String memberId = SecurityUtil.getCurrentMemberId();
+        paraphraseHistoryService.deleteHistory(memberId, historyId);
+        return ResponseEntity.ok().build();
+    }
+
+    // 3-5. 히스토리 최신 내용 조회
+    @GetMapping("/histories/{historyId}/latest")
+    public HistoryContentResponseDTO getHistoryContent(@PathVariable Long historyId) {
+        String memberId = SecurityUtil.getCurrentMemberId();
+        return paraphraseHistoryService.readHistoryContent(memberId, historyId);
     }
 
 
