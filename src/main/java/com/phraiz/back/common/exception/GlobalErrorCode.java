@@ -21,7 +21,19 @@ public enum GlobalErrorCode implements ErrorCode {
 
     // 기타
     RESOURCE_NOT_FOUND(404, "CLT004", "요청한 리소스를 찾을 수 없습니다.", "GLOBAL"),
-    METHOD_NOT_ALLOWED(405, "CLT005", "허용되지 않은 HTTP 메서드입니다.", "GLOBAL");
+    METHOD_NOT_ALLOWED(405, "CLT005", "허용되지 않은 HTTP 메서드입니다.", "GLOBAL"),
+    // GlobalErrorCode.java 중 일부 (추가)
+    // 인증/인가 - SECURITY
+    AUTH_HEADER_MISSING(401, "AUTH001", "인증 토큰이 존재하지 않습니다.", "SECURITY"),
+    AUTH_TOKEN_MALFORMED(400, "AUTH002", "토큰 형식이 올바르지 않습니다.", "SECURITY"),
+    AUTH_TOKEN_EXPIRED(401, "AUTH003", "액세스 토큰이 만료되었습니다.", "SECURITY"),
+    AUTH_TOKEN_INVALID(401, "AUTH004", "유효하지 않은 액세스 토큰입니다.", "SECURITY"),
+    AUTH_TOKEN_LOGGED_OUT(401, "AUTH005", "이미 로그아웃된 토큰입니다.", "SECURITY"),
+    AUTH_USER_NOT_FOUND(401, "AUTH006", "인증 대상 사용자를 찾을 수 없습니다.", "SECURITY"),
+    AUTH_REDIS_ERROR(503, "AUTH007", "세션 검증 중 캐시 서버 오류가 발생했습니다.", "SECURITY"),
+    AUTH_SECURITY_CONTEXT_ERROR(500, "AUTH008", "보안 컨텍스트 설정 중 오류가 발생했습니다.", "SECURITY"),
+    AUTH_INTERNAL(500, "AUTH999", "인증 처리 중 내부 오류가 발생했습니다.", "SECURITY");
+
 
     private final int status;
     private final String code;
