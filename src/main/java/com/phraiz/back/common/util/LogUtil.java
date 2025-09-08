@@ -3,6 +3,7 @@ package com.phraiz.back.common.util;
 import com.phraiz.back.common.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.http.server.ServerHttpRequest;
 
 // 로그 작성 Util
@@ -10,13 +11,17 @@ public class LogUtil {
 
     public static void logError(Logger logger, HttpServletRequest request, ErrorCode errorCode, Throwable ex) {
         if (ex != null) {
-            logger.error("[❌ ERROR {}] {} {} | code={}, message={}, exception={}",
+            Throwable root = NestedExceptionUtils.getMostSpecificCause(ex);
+            logger.error("[❌ ERROR {}] {} {} | code={}, message={}, exception={}, , rootCause={} - {}",
                     errorCode.getService(),
                     request.getMethod(),
                     request.getRequestURI(),
                     errorCode.getCode(),
                     errorCode.getMessage(),
-                    ex.getMessage()
+                    ex.getMessage(),
+                    (root != null ? root.getClass().getSimpleName() : "n/a"),
+                    (root != null ? root.getMessage() : "n/a"),
+                    ex // 전체 스택 출력
             );
         } else {
             logger.error("[❌ ERROR {}] {} {} | code={}, message={}",
