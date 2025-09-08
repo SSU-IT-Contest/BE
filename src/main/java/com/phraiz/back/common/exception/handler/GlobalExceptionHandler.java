@@ -81,15 +81,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }
 
-    // 5. 나머지 모든 예외 (catch-all)
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGlobalException(Exception ex, HttpServletRequest request) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("status", 500);
-        error.put("code", "SYS000");
-        error.put("message", "서버 내부 오류가 발생했습니다.");
-        error.put("service", "GLOBAL");
-        error.put("path", request.getRequestURI()); // 또는 request에서 동적으로 추출 가능
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-    }
+//    // 5. 나머지 모든 예외 (catch-all)
+//    @ExceptionHandler(Exception.class)
+//    public ResponseEntity<Map<String, Object>> handleGlobalException(Exception ex, HttpServletRequest request) {
+//        Map<String, Object> error = new HashMap<>();
+//        error.put("status", 500);
+//        error.put("code", "SYS000");
+//        error.put("message", "서버 내부 오류가 발생했습니다.");
+//        error.put("service", "GLOBAL");
+//        error.put("path", request.getRequestURI()); // 또는 request에서 동적으로 추출 가능
+//        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+//    }
 }

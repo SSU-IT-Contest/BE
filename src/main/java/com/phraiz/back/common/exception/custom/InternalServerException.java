@@ -21,6 +21,20 @@ public class InternalServerException extends RuntimeException {
         this.detailMessage = detailMessage;
     }
 
+    // 생성자: 예외 코드 + 원인 예외(cause)
+    public InternalServerException(ErrorCode errorCode, Throwable cause) {
+        super(errorCode.getMessage(), cause);
+        this.errorCode = errorCode;
+        this.detailMessage = null;
+    }
+
+    // 생성자: 예외 코드 + 추가 메시지 + 원인 예외(cause)
+    public InternalServerException(ErrorCode errorCode, String detailMessage, Throwable cause) {
+        super(errorCode.getMessage() + ": " + detailMessage, cause);
+        this.errorCode = errorCode;
+        this.detailMessage = detailMessage;
+    }
+
     // 예외 코드만 반환
     public ErrorCode getErrorCode() {
         return errorCode;
