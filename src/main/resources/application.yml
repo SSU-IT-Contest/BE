@@ -22,7 +22,7 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME:choeunbin0324}
+    username: ${MAIL_USERNAME}
     password: ${MAIL_PASSWORD}
     properties:
       mail:
@@ -49,3 +49,6 @@ openai:
     paraphrase: 0.3
     summary: 0.7
   max-tokens: 500
+
+zotero:
+  url: ${ZOTERO_URL:http://localhost:1969/web}
