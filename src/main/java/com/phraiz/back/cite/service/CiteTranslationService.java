@@ -1,6 +1,7 @@
 package com.phraiz.back.cite.service;
 
 import com.phraiz.back.cite.dto.response.ZoteroItem;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -14,7 +15,9 @@ import java.util.UUID;
 
 @Service
 public class CiteTranslationService {
-   private final RestTemplate restTemplate;
+    @Value("${zotero.url}")
+    private String zoteroUrl;
+    private final RestTemplate restTemplate;
 
    public CiteTranslationService() {
        this.restTemplate = new RestTemplate();
