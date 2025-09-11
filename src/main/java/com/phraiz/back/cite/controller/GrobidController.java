@@ -1,6 +1,8 @@
 package com.phraiz.back.cite.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.phraiz.back.cite.dto.request.CitationRequestDTO;
+import com.phraiz.back.cite.dto.request.GrobidRequestDTO;
 import com.phraiz.back.cite.dto.response.ZoteroItem;
 import com.phraiz.back.cite.service.CiteConvertService;
 import com.phraiz.back.cite.service.GrobidService;
@@ -29,14 +31,16 @@ public class GrobidController {
     }
 
     @PostMapping("/grobid")
-    public ResponseEntity<Map<String, Object>> convertCitation(@RequestBody String citation) throws Exception {
+    public ResponseEntity<Map<String, Object>> convertCitation(@RequestBody GrobidRequestDTO grobidRequestDTO) throws Exception {
         Map<String, Object> response = new HashMap<>();
+        String citation = grobidRequestDTO.getCitation();
         log.info("[convertCitation] grobid 호출 시작");
         JsonNode grobidJson = grobidService.parseCitation(citation); // grobid 호출
         log.info("[convertCitation] grobid 호출 완료");
         ZoteroItem zoteroItem = grobidService.grobidJsonToZoteroItem(grobidJson); // grobid 호출된 값 -> zoteroItem으로 변환
         log.info("[convertCitation] grobid 데이터 -> zoteroItem 으로 변환 완료");
         JSONObject jsonObject = citeConvertService.toCSL(zoteroItem); // csl json 로 변환
+        log.info("[convertCitation] zoteroItem -> csl json 으로 변환 완료");
 
         response.put("cslJson", jsonObject);
 
