@@ -1,7 +1,9 @@
 package com.phraiz.back.member.controller;
 
 import com.phraiz.back.common.security.jwt.JwtUtil;
+import com.phraiz.back.member.domain.Member;
 import com.phraiz.back.member.dto.response.LoginResponseDTO;
+import com.phraiz.back.member.repository.MemberRepository;
 import com.phraiz.back.member.service.MemberService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
@@ -10,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -23,6 +26,7 @@ public class OauthController {
     private RedisTemplate<String, String> redisTemplate;
     private final JwtUtil jwtUtil;
     private final MemberService memberService;
+    private final MemberRepository memberRepository;
 
     @PostMapping("/token")
     public ResponseEntity<?> exchangeTempCode(@RequestBody Map<String, String> request, HttpServletResponse response) {
@@ -37,7 +41,9 @@ public class OauthController {
         redisTemplate.delete(tempToken);
 
         // Access/Refresh Token 생성
-        String accessToken = jwtUtil.generateAccessToken(id);
+        Member member=memberRepository.findById(id)
+                .orElseThrow(()->new UsernameNotFoundException("존재하지 않는 사용자입니다."));
+        String accessToken = jwtUtil.generateAccessToken(id, member.getMemberId());
         String refreshToken = jwtUtil.generateRefreshToken(id);
 
         // refresh token redis에 저장
