@@ -1,9 +1,7 @@
 package com.phraiz.back.member.service;
 
-import com.phraiz.back.common.enums.Plan;
 import com.phraiz.back.common.exception.custom.BusinessLogicException;
 import com.phraiz.back.common.exception.custom.InvalidRefreshTokenException;
-import com.phraiz.back.common.exception.custom.RefreshTokenExpiredException;
 import com.phraiz.back.common.security.jwt.JwtUtil;
 import com.phraiz.back.common.util.RedisUtil;
 import com.phraiz.back.member.domain.Member;
@@ -68,8 +66,6 @@ public class MemberService {
         }
         // 새로운 access token 발급
         String newAccessToken = jwtUtil.generateAccessToken(id, member.getMemberId());
-        // 새로운 refresh token 발급
-        //String newRefreshToken = jwtUtil.generateAccessToken(id);
 
         // Redis 업데이트: 기존 삭제 후 새로운 것 저장
 //        redisTemplate.delete("RT:"+id);

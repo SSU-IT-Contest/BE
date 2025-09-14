@@ -43,7 +43,6 @@ public class CiteController {
     private final CiteFolderService citeFolderService;
 
     /* ---------- 1. 인용문 생성 과정 ---------- */
-
     // 1. 인용문 저장 과정
     // 1-1. 메타데이터 가지고오고 CSL json 으로 변환 후 csl, cite_id 응답보내기
     @PostMapping("/getUrlData")
