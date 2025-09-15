@@ -32,7 +32,7 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
 
         // 토큰 발급 //
         // 토큰 생성
-        String accessToken = jwtUtil.generateAccessToken(id);
+        //String accessToken = jwtUtil.generateAccessToken(id);
         String refreshToken = jwtUtil.generateRefreshToken(id);
 
         // refresh token redis에 저장

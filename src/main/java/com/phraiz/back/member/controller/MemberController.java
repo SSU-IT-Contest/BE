@@ -57,6 +57,27 @@ public class MemberController {
 
     }
 
+    // 회원 요금제 반영
+    @PatchMapping("/{memberId}/plan")
+    public ResponseEntity<Void> updatePlan(@PathVariable("memberId") Long memberId, @RequestBody Map<String, Object> body, @RequestHeader("Authorization") String authHeader){
+        /* 로그인한 사용자만 변경 가능 */
+        // JWT에서 로그인한 사용자 토큰 추출
+        String token = authHeader.replace("Bearer ", "");
+        // JwtUtil로 memberId 추출
+        Long loggedInMemberId = jwtUtil.getMemberIdFromToken(token);
+        // 권한 체크
+        if (!memberId.equals(loggedInMemberId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        Long planId = Long.valueOf(body.get("planId").toString());
+
+
+
+        memberService.updatePlan(memberId, planId);
+        return ResponseEntity.ok().build();
+    }
+
     /* 1. 회원가입 */
     // 1-1. 회원 가입(+아이디,이메일 중복 체크)
     @PostMapping("/signUp")
@@ -118,7 +139,7 @@ public class MemberController {
         Member member = memberService.login(loginRequestDTO);
 
         // 토큰 생성
-        String accessToken = jwtUtil.generateAccessToken(member.getId());
+        String accessToken = jwtUtil.generateAccessToken(member.getId(), member.getMemberId());
         String refreshToken = jwtUtil.generateRefreshToken(member.getId());
 
         // refresh token redis에 저장
@@ -134,7 +155,7 @@ public class MemberController {
         response.addCookie(refreshTokenCookie);
 
         // 응답 DTO에서는 refreshToken 제거
-        LoginResponseDTO loginResponseDTO = new LoginResponseDTO(accessToken,member.getMemberId(),member.getId(),member.getEmail(),member.getRole());
+        LoginResponseDTO loginResponseDTO = new LoginResponseDTO(accessToken,member.getMemberId(),member.getId(),member.getEmail(),member.getRole(), member.getPlanId());
         return ResponseEntity.ok(loginResponseDTO);
     }
     // 2-2. 로그아웃

@@ -2,7 +2,6 @@ package com.phraiz.back.member.service;
 
 import com.phraiz.back.common.exception.custom.BusinessLogicException;
 import com.phraiz.back.common.exception.custom.InvalidRefreshTokenException;
-import com.phraiz.back.common.exception.custom.RefreshTokenExpiredException;
 import com.phraiz.back.common.security.jwt.JwtUtil;
 import com.phraiz.back.common.util.RedisUtil;
 import com.phraiz.back.member.domain.Member;
@@ -22,6 +21,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -56,6 +56,7 @@ public class MemberService {
         }
 
         String id=jwtUtil.getSubjectFromToken(refreshToken); // 사용자의 고유 아이디
+        Member member = memberRepository.findById(id).orElseThrow(()-> new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
 
         // redis 에 저장된 refresh 토큰과 일치확인
         String storedRefreshToken=redisTemplate.opsForValue().get("RT:"+id);
@@ -64,9 +65,7 @@ public class MemberService {
             throw new InvalidRefreshTokenException("저장된 refresh token과 일치하지 않습니다.");
         }
         // 새로운 access token 발급
-        String newAccessToken = jwtUtil.generateAccessToken(id);
-        // 새로운 refresh token 발급
-        //String newRefreshToken = jwtUtil.generateAccessToken(id);
+        String newAccessToken = jwtUtil.generateAccessToken(id, member.getMemberId());
 
         // Redis 업데이트: 기존 삭제 후 새로운 것 저장
 //        redisTemplate.delete("RT:"+id);
@@ -75,15 +74,12 @@ public class MemberService {
 //                newRefreshToken,jwtUtil.getRefreshTokenExpTime(), TimeUnit.MILLISECONDS
 //        );
 
-
-        Member member=memberRepository.findById(id)
-                .orElseThrow(()->new UsernameNotFoundException("존재하지 않는 사용자입니다."));
-
         return new LoginResponseDTO(newAccessToken,
                 member.getMemberId(),
                 member.getId(),
                 member.getEmail(),
-                member.getRole());
+                member.getRole(),
+                member.getPlanId());
     }
 
     // 쿠키에 저장
@@ -100,6 +96,15 @@ public class MemberService {
         refreshTokenCookie.setAttribute("SameSite", "None"); // Spring에서 직접 지원 안하면 response 헤더로 수동 추가 필요
         return refreshTokenCookie;
     }
+
+    // 회원 요금제 반영
+    @Transactional
+    public void updatePlan(Long memberId, Long planId){
+        // 식별자로 사용자 조회
+        Member member=memberRepository.findByMemberId(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        member.setPlanId(planId);
+    }
+
 
     /* 1. 회원가입 */
     // 1-1. 회원가입
@@ -279,7 +284,8 @@ public class MemberService {
                 member.getMemberId(),
                 member.getId(),
                 member.getEmail(),
-                member.getRole());
+                member.getRole(),
+                member.getPlanId());
     }
 
 
