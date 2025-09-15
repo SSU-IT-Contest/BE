@@ -2,20 +2,15 @@ package com.phraiz.back.member.service;
 
 import com.phraiz.back.common.exception.custom.BusinessLogicException;
 import com.phraiz.back.common.util.RedisUtil;
-import com.phraiz.back.member.domain.Member;
-import com.phraiz.back.member.dto.response.LoginResponseDTO;
 import com.phraiz.back.member.exception.MemberErrorCode;
 import com.phraiz.back.member.repository.MemberRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.MailException;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -87,7 +82,6 @@ public class EmailService {
         String storedAuthNum = redisUtil.getData(redisKey);
         // 저장된 인증번호가 없음 (만료되었거나 발급되지 않음)
         if (storedAuthNum == null) {
-            //log.warn("인증번호 검증 실패: 저장된 인증번호 없음, email={}", email);
             throw new BusinessLogicException(MemberErrorCode.VERIFICATION_CODE_EXPIRED);
         }
         // 입력된 인증번호와 저장된 인증번호 비교

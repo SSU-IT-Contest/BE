@@ -71,6 +71,7 @@ public class SecurityConfig {
 
                         // .requestMatchers("/api/cite/**").authenticated()  //  로그인 필수
                         .requestMatchers("/api/members/logout").authenticated()
+                        .requestMatchers("/api/members/{memberId}/plan").authenticated()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login((oauth2Login) ->{
