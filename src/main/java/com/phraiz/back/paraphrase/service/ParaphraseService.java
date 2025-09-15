@@ -34,22 +34,23 @@ public class ParaphraseService {
     private final MemberRepository memberRepository;
 
     public ParaphraseResponseDTO paraphraseStandard(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
-        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.STANDARD.getPrompt(),
+        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.STANDARD.getPrompt(), paraphraseRequestDTO.getScale(),
                 paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
     }
     public ParaphraseResponseDTO paraphraseAcademic(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
-        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.ACADEMIC.getPrompt(),
+        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.ACADEMIC.getPrompt(), paraphraseRequestDTO.getScale(),
                 paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
     }
     public ParaphraseResponseDTO paraphraseCreative(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
-        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.CREATIVE.getPrompt(),
+        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.CREATIVE.getPrompt(), paraphraseRequestDTO.getScale(),
                 paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
     }
     public ParaphraseResponseDTO paraphraseFluency(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
-        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.FLUENCY.getPrompt(), paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
+        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.FLUENCY.getPrompt(), paraphraseRequestDTO.getScale(),
+                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
     }
     public ParaphraseResponseDTO paraphraseExperimental(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
-        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.EXPERIMENTAL.getPrompt(),
+        return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.EXPERIMENTAL.getPrompt(), paraphraseRequestDTO.getScale(),
                 paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
     }
     public ParaphraseResponseDTO paraphraseCustom(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
@@ -65,7 +66,7 @@ public class ParaphraseService {
         if(paraphraseMode == null){
             throw new BusinessLogicException(ParaphraseErrorCode.INVALID_INPUT);
         }
-        return paraphrase(memberId, paraphraseRequestDTO.getText(), paraphraseMode,
+        return paraphrase(memberId, paraphraseRequestDTO.getText(), paraphraseMode, paraphraseRequestDTO.getScale(),
                 paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
     }
 
@@ -73,7 +74,7 @@ public class ParaphraseService {
         // 1. paraphrase 메서드
     private ParaphraseResponseDTO paraphrase(String memberId,
                                              String paraphraseRequestedText,
-                                             String paraphraseMode,
+                                             String paraphraseMode, int scale,
                                              Long folderId,
                                              Long historyId){
 
@@ -88,7 +89,7 @@ public class ParaphraseService {
         }
 
         // 3. paraphrase 처리 (service 호출)
-        String result = openAIService.callParaphraseOpenAI(paraphraseRequestedText, paraphraseMode);
+        String result = openAIService.callParaphraseOpenAI(paraphraseRequestedText, paraphraseMode, scale);
 
         // 4. 내용 저장 (히스토리 업데이트)
         HistoryMetaDTO metaDTO = paraphraseHistoryService.saveOrUpdateHistory(  // ★

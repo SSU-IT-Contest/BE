@@ -1,5 +1,6 @@
 package com.phraiz.back.common.security.jwt;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -35,13 +36,14 @@ public class JwtUtil {
     }
 
     // access token 생성
-    public String generateAccessToken(String id) {
+    public String generateAccessToken(String id, Long memberId) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + accessTokenExpTime);
 
         // 최종적으로 String 의 JWT 토큰 반환
         return Jwts.builder()
                 .setSubject(id)
+                .claim("memberId", memberId)    // 권한 체크용
                 .setIssuedAt(now) // 발급시간
                 .setExpiration(expiryDate)
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -76,4 +78,12 @@ public class JwtUtil {
         return true;
     }
 
+    // 토큰에서 memberId 추출
+    public Long getMemberIdFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .setSigningKey(key)
+                .parseClaimsJws(token)
+                .getBody();
+        return Long.valueOf(claims.get("memberId").toString());
+    }
 }
