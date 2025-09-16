@@ -30,7 +30,7 @@ public class ParaphraseHistoryService extends AbstractHistoryService<ParaphraseH
 
     private final int MAX_HISTORY_FOR_FREE = 30;
     private static final DateTimeFormatter DATE_FMT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd"); // 원하는 포맷으로 변경 가능
+            DateTimeFormatter.ofPattern("yyMMdd"); // 원하는 포맷으로 변경 가능
 
 
     protected ParaphraseHistoryService(BaseHistoryRepository<ParaphraseHistory> repo, MemberRepository memberRepository) {
@@ -112,9 +112,8 @@ public class ParaphraseHistoryService extends AbstractHistoryService<ParaphraseH
 
 
     private String buildTitle(long id) {
-        String today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"))
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-        return today + " 패러프레이징 " + id;
+        String today = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DATE_FMT);
+        return today + "-패러프레이징-" + id;
     }
 //    private String makeDefaultTitle(String text) {
 //        return (text.length() > 30 ? text.substring(0, 30) + "…" : text);

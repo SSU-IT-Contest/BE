@@ -31,7 +31,7 @@ public class SummaryHistoryService extends AbstractHistoryService<SummaryHistory
 
     private final int MAX_HISTORY_FOR_FREE = 30;
     private static final DateTimeFormatter DATE_FMT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            DateTimeFormatter.ofPattern("yyMMdd");
 
     protected SummaryHistoryService(BaseHistoryRepository<SummaryHistory> repo, MemberRepository memberRepository) {
         super(repo);
@@ -105,7 +105,7 @@ public class SummaryHistoryService extends AbstractHistoryService<SummaryHistory
     private String buildDatedTitle(String label, long id) {
         String today = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DATE_FMT);
         // 예) 2025-09-16 요약 123
-        return today + " " + label + " " + id;
+        return today + "-" + label + "-" + id;
     }
 
     private String makeDefaultTitle(String text) {
