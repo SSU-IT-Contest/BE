@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 
 @Service
@@ -86,8 +87,11 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
         }
 
         // 2) CREATE
-        String autoTitle = makeDefaultTitle(content);      // 본문 앞 30자 + "..." 등
+        //String autoTitle = makeDefaultTitle(content);      // 본문 앞 30자 + "..." 등
+        // 원하는 형식: yyMMdd
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMdd");
 
+        String autoTitle = cite.getCreatedAt().format(formatter) + "-" + "인용-" + cite.getCiteId();
         CiteHistory newHistory = CiteHistory.builder()
                 .memberId(memberId)
                 .folderId(folderId)

@@ -5,13 +5,16 @@ import com.phraiz.back.cite.dto.response.CitationHistoryContentResponseDTO;
 import com.phraiz.back.cite.dto.response.CitationResponseDTO;
 import com.phraiz.back.cite.dto.response.Creator;
 import com.phraiz.back.cite.dto.response.ZoteroItem;
+import com.phraiz.back.cite.exception.CiteErrorCode;
 import com.phraiz.back.cite.parser.DbpiaAuthorParser;
 import com.phraiz.back.cite.parser.KissAuthorParser;
+import com.phraiz.back.cite.parser.KyoboAuthorParser;
 import com.phraiz.back.cite.service.*;
 import com.phraiz.back.common.dto.request.HistoryUpdateDTO;
 import com.phraiz.back.common.dto.request.UpdateRequestDTO;
 import com.phraiz.back.common.dto.response.FoldersResponseDTO;
 import com.phraiz.back.common.dto.response.HistoriesResponseDTO;
+import com.phraiz.back.common.exception.custom.BusinessLogicException;
 import com.phraiz.back.common.security.user.CustomUserDetails;
 import com.phraiz.back.common.util.SecurityUtil;
 import com.phraiz.back.member.domain.Member;
@@ -40,7 +43,6 @@ public class CiteController {
     private final CiteFolderService citeFolderService;
 
     /* ---------- 1. 인용문 생성 과정 ---------- */
-
     // 1. 인용문 저장 과정
     // 1-1. 메타데이터 가지고오고 CSL json 으로 변환 후 csl, cite_id 응답보내기
     @PostMapping("/getUrlData")
@@ -58,18 +60,25 @@ public class CiteController {
         if (item.getCreators() == null || item.getCreators().isEmpty() ||
                 (item.getCreators().get(0).getLastName() == null && item.getCreators().get(0).getFirstName() == null)) {
             log.info("[getUrlData] metadata author==null");
-
-            // dbpia
+            List<Creator> creators = null;
             if (url.contains("dbpia.co.kr")) {
                 // DbpiaAuthorParser 호출
-                List<Creator> creators = DbpiaAuthorParser.getAuthor(url);
+                creators = DbpiaAuthorParser.getAuthor(url);
                 item.setCreators(creators);
             } else if (url.contains("kiss.kstudy.com")) {
                 // KissAuthorParser 호출
-                List<Creator> creators = KissAuthorParser.getAuthor(url);
+                creators = KissAuthorParser.getAuthor(url);
+                item.setCreators(creators);
+            }else if (url.contains("scholar.kyobobook.co.kr")) {
+                // KyoboAuthorParser 호출
+                creators = KyoboAuthorParser.getAuthors(url);
                 item.setCreators(creators);
             }
-            List< Creator> creators = DbpiaAuthorParser.getAuthor(url);
+            // 저자를 계속 찾지 못하면 예외를 발생
+            if (creators == null || creators.isEmpty()) {
+                throw new BusinessLogicException(CiteErrorCode.METADATA_EXTRACTION_FAILED);
+            }
+           // item.setCreators(creators);
 
         }
         // 2. cslJson 으로 변환

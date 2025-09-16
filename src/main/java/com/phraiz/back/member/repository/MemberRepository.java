@@ -12,4 +12,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     Optional<Member> findById(String id);
 
     Optional<Member> findByEmail(String email);
+
+    // 엔티티 필드 변경 없이 Repository 에 추가
+    Optional<Member> findByMemberId(Long memberId); // 식별자
 }

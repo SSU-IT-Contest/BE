@@ -9,4 +9,5 @@ public class ParaphraseRequestDTO{
         Long historyId;
         String text;    // 패러프레이징 요청 text
         String userRequestMode;
+        int scale; // 슬라이더 값
 }
