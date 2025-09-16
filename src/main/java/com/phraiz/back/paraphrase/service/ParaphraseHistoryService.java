@@ -16,6 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 
 @Service
@@ -26,6 +29,9 @@ public class ParaphraseHistoryService extends AbstractHistoryService<ParaphraseH
     private final MemberRepository memberRepository;
 
     private final int MAX_HISTORY_FOR_FREE = 30;
+    private static final DateTimeFormatter DATE_FMT =
+            DateTimeFormatter.ofPattern("yyMMdd"); // 원하는 포맷으로 변경 가능
+
 
     protected ParaphraseHistoryService(BaseHistoryRepository<ParaphraseHistory> repo, MemberRepository memberRepository) {
         super(repo);
@@ -81,21 +87,36 @@ public class ParaphraseHistoryService extends AbstractHistoryService<ParaphraseH
         }
 
         // 2) CREATE
-        String autoTitle = makeDefaultTitle(content);      // 본문 앞 30자 + "..." 등
+        // repo.~ 메서드를 통해 ParaphraseHistory 테이블의 가장 큰 historyId 값을 가져오기
+        // title = 현재 날짜 + "패러프레이징" + 위에서 가져온 historyId+1
+        //String autoTitle = makeDefaultTitle(content);      // 본문 앞 30자 + "..." 등
 
+        // (A) 임시 제목으로 먼저 INSERT 해서 PK(id) 확보
         ParaphraseHistory newHistory = ParaphraseHistory.builder()
                 .memberId(memberId)
                 .folderId(folderId)
-                .name(autoTitle)
+                .name("temp")        // 임시값
                 .content(content)
                 .build();
 
-        repo.save(newHistory);
+        repo.saveAndFlush(newHistory); // <= 여기서 id 생성됨 (IDENTITY일 때)
+
+        // (B) 확정 제목 생성: yyyy-MM-dd 패러프레이징 {id}
+        String finalTitle = buildTitle(newHistory.getId());
+
+        // (C) 제목만 수정 -> 트랜잭션 종료 시 UPDATE 1회 (save 호출 불필요)
+        newHistory.setName(finalTitle);
+
         return new HistoryMetaDTO(newHistory.getId(), newHistory.getName());
     }
 
-    private String makeDefaultTitle(String text) {
-        return (text.length() > 30 ? text.substring(0, 30) + "…" : text);
+
+    private String buildTitle(long id) {
+        String today = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DATE_FMT);
+        return today + "-패러프레이징-" + id;
     }
+//    private String makeDefaultTitle(String text) {
+//        return (text.length() > 30 ? text.substring(0, 30) + "…" : text);
+//    }
 
 }

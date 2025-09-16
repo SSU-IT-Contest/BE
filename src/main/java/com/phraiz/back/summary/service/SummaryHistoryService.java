@@ -16,6 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 
 
@@ -27,6 +30,8 @@ public class SummaryHistoryService extends AbstractHistoryService<SummaryHistory
     private final MemberRepository memberRepository;
 
     private final int MAX_HISTORY_FOR_FREE = 30;
+    private static final DateTimeFormatter DATE_FMT =
+            DateTimeFormatter.ofPattern("yyMMdd");
 
     protected SummaryHistoryService(BaseHistoryRepository<SummaryHistory> repo, MemberRepository memberRepository) {
         super(repo);
@@ -81,18 +86,26 @@ public class SummaryHistoryService extends AbstractHistoryService<SummaryHistory
             return new HistoryMetaDTO(history.getId(), history.getName());
         }
 
-        // 2) CREATE
-        String autoTitle = makeDefaultTitle(content);      // 본문 앞 30자 + "..." 등
-
+        // 2) CREATE (임시 제목으로 INSERT → PK 확보 → 최종 제목 세팅)
         SummaryHistory newHistory = SummaryHistory.builder()
                 .memberId(memberId)
                 .folderId(folderId)
-                .name(autoTitle)
+                .name("temp")          // 임시값
                 .content(content)
                 .build();
 
-        repo.save(newHistory);
+        repo.saveAndFlush(newHistory); // PK(id) 확보 (IDENTITY에서도 즉시 INSERT)
+
+        String finalTitle = buildDatedTitle("요약", newHistory.getId()); // ← 라벨 변경 가능
+        newHistory.setName(finalTitle); // 같은 트랜잭션에서 UPDATE 1회
+
         return new HistoryMetaDTO(newHistory.getId(), newHistory.getName());
+    }
+
+    private String buildDatedTitle(String label, long id) {
+        String today = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DATE_FMT);
+        // 예) 2025-09-16 요약 123
+        return today + "-" + label + "-" + id;
     }
 
     private String makeDefaultTitle(String text) {
