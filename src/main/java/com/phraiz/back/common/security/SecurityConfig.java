@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -67,6 +68,7 @@ public class SecurityConfig {
                 .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorizeRequests ->authorizeRequests
                         // TODO 인증 없이 접근 허용한 부분
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/members/reissue","/api/members/signUp","/api/members/login","/api/members/findId", "/api/members/findPwd","/api/members/verifyResetToken","/api/members/resetPwd", "/api/members/checkId",
                                 "/api/members/emails/**", "/api/oauth/token",
                                 "/api/cite/**",
