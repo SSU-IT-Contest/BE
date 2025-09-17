@@ -58,7 +58,7 @@ public class SecurityConfig {
                         "http://localhost:8080",
                         "https://ssu-phraiz-fe.vercel.app"
                     ));
-                    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
                     config.setAllowedHeaders(List.of("*"));
                     config.setExposedHeaders(List.of("Authorization")); // 프론트에서 Authorization 헤더 접근할 수 있도록
                     config.setAllowCredentials(true); // 쿠키 전달 허용
