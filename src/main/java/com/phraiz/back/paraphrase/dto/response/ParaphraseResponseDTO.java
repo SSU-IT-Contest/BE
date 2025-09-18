@@ -9,4 +9,5 @@ public class ParaphraseResponseDTO {
     Long resultHistoryId;
     String name;
     String result;
+    long remainingToken;
 }
