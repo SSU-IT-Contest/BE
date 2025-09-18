@@ -7,7 +7,6 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 
 @Entity
-@Builder
 @Getter
 @Table(
         name = "monthly_token_usage",
