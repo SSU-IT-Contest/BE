@@ -7,12 +7,13 @@ spring:
             client-id: ${GOOGLE_CLIENT_ID}
             client-secret: ${GOOGLE_CLIENT_SECRET}
             scope: email
-            redirect-uri: "http://${HOST}/login/oauth2/code/google" # TODO https
+            # redirect-uri: "http://${HOST}/login/oauth2/code/google"
+            redirect-uri: "https://${HOST}/login/oauth2/code/google"
           kakao:
             client-id: ${KAKAO_CLIENT_ID}
             client-secret: ${KAKAO_CLIENT_SECRET} # 없을 시 생략. client-authentication-method 도 같이 삭제
             client-name: Kakao
-            redirect-uri: "http://${HOST}/login/oauth2/code/kakao"
+            redirect-uri: "https://${HOST}/login/oauth2/code/kakao"
             authorization-grant-type: authorization_code
             scope:
               - account_email
@@ -26,7 +27,7 @@ spring:
               - email
             client-name: Naver
             authorization-grant-type: authorization_code
-            redirect-uri: "http://localhost:8080/login/oauth2/code/naver"
+            redirect-uri: "https://${HOST}/login/oauth2/code/naver"
         provider:
           kakao:
             authorization-uri: https://kauth.kakao.com/oauth/authorize
