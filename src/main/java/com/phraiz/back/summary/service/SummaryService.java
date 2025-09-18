@@ -2,6 +2,7 @@ package com.phraiz.back.summary.service;
 
 import com.phraiz.back.common.dto.response.HistoryMetaDTO;
 import com.phraiz.back.common.exception.custom.BusinessLogicException;
+import com.phraiz.back.common.service.MonthlyTokenUsageService;
 import com.phraiz.back.common.service.OpenAIService;
 import com.phraiz.back.common.service.RedisService;
 import com.phraiz.back.common.enums.Plan;
@@ -29,6 +30,7 @@ public class SummaryService {
     private final OpenAIService openAIService;
     private final RedisService redisService;
     private final SummaryHistoryService summaryHistoryService;
+    private final MonthlyTokenUsageService tokenUsageService;
     private final MemberRepository memberRepository;
 
     public SummaryResponseDTO oneLineSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
@@ -95,6 +97,8 @@ public class SummaryService {
                                        Long folderId,
                                        Long historyId){
 
+        long remainingToken = 0;
+
         // 1. 로그인한 멤버 정보 가져오기 - 멤버의 요금제 정보
         Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
 
@@ -102,13 +106,12 @@ public class SummaryService {
         // 2-1. 남은 월 토큰 확인 (DB나 Redis에서 누적 사용량 조회)
         Plan userPlan = Plan.fromId(member.getPlanId());
         if(userPlan != Plan.PRO){
-            validateRemainingMonthlyTokens(memberId, userPlan, summarizeRequestedText);
+            remainingToken = validateRemainingMonthlyTokens(memberId, userPlan, summarizeRequestedText);
         }
 
         // 3. 요약 처리 (service 호출)
         String result = openAIService.callSummaryOpenAI(summarizeRequestedText, summarizeMode);
 
-        // 4. 내용 저장 (히스토리 업데이트)
         // 4. 내용 저장 (히스토리 업데이트)
         HistoryMetaDTO metaDTO = summaryHistoryService.saveOrUpdateHistory(  // ★
                 memberId,
@@ -119,20 +122,19 @@ public class SummaryService {
 
         // 5. 사용량 업데이트
         //    - 월 토큰 사용량 증가
-        /**
-         * Todo. 사용량 table 생성 후 저장
-         */
-        redisService.incrementMonthlyUsage(memberId, YearMonth.now().toString(), GptTokenUtil.estimateTokenCount(summarizeRequestedText));
+        incrementMonthlyUsage(memberId, YearMonth.now().toString(), GptTokenUtil.estimateTokenCount(summarizeRequestedText));
 
         // 6. result return
         SummaryResponseDTO responseDTO = SummaryResponseDTO.builder()
                 .historyId(metaDTO.id())
                 .name(metaDTO.name())
-                .result(result).build();
+                .result(result)
+                .remainingToken(remainingToken)
+                .build();
         return responseDTO;
     }
 
-    private void validateRemainingMonthlyTokens(String memberId, Plan plan, String text){
+    private long validateRemainingMonthlyTokens(String memberId, Plan plan, String text){
 
         // 1. 현재까지 사용량
         long usedTokensThisMonth = findOrInitializeMonthlyUsage(memberId, YearMonth.now().toString());
@@ -147,6 +149,7 @@ public class SummaryService {
         if (remaining < requestedTokens) {
             throw new BusinessLogicException(SummaryErrorCode.MONTHLY_TOKEN_LIMIT_EXCEEDED, String.format("월 토큰 한도를 초과하였습니다. (요청: %d, 남음: %d)", requestedTokens, remaining));
         }
+        return remaining - requestedTokens;
     }
 
     private long findOrInitializeMonthlyUsage(String memberId, String month){
@@ -157,19 +160,16 @@ public class SummaryService {
             return value;
         }
 
-        /**
-         * Todo. Redis에 없으면 DB에서 조회
-         */
         // 2-1. Redis에 없으면 DB에서 조회
-//        Long dbValue = userTokenUsageRepository
-//                .findUsedTokens(memberId, month)  // ex) Optional<Long>
-//                .orElse(0L);
-        Long dbValue = 0L;
+        long used = tokenUsageService.findOrInitializeUsedTokens(memberId, month);
+        redisService.setMonthlyUsage(memberId, month, used);
+        return used;
+    }
 
-        // 2-2. Redis에 캐싱
-        redisService.setMonthlyUsage(memberId, month, dbValue);
-
-        return dbValue;
+    private void incrementMonthlyUsage (String memberId, String month, long increment){
+        long after = tokenUsageService.incrementUsedTokens(memberId, month, increment);
+        // 캐시 동기화(정합성 보장)
+        redisService.incrementMonthlyUsage(memberId, month, increment);
     }
 
 }
