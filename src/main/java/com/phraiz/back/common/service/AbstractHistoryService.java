@@ -4,9 +4,12 @@ import com.phraiz.back.common.domain.BaseHistory;
 import com.phraiz.back.common.dto.request.HistoryUpdateDTO;
 import com.phraiz.back.common.dto.response.HistoriesResponseDTO;
 import com.phraiz.back.common.dto.response.HistoryContentResponseDTO;
+import com.phraiz.back.common.exception.GlobalErrorCode;
+import com.phraiz.back.common.exception.custom.BusinessLogicException;
 import com.phraiz.back.common.repository.BaseHistoryRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -34,27 +37,41 @@ public abstract class AbstractHistoryService<E extends BaseHistory> {
         validateRemainingHistoryCount(memberId);
 
         E entity = newHistoryEntity(memberId, folderId, name);
-        repo.save(entity);
+        try {
+            repo.save(entity);
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessLogicException(GlobalErrorCode.HISTORY_NAME_EXISTS);
+        }
     }
     public void updateHistory(String memberId, Long id, HistoryUpdateDTO dto) {
         E history = repo.findByIdAndMemberId(id, memberId)
-                .orElseThrow(() -> new EntityNotFoundException("히스토리를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessLogicException(GlobalErrorCode.HISTORY_NOT_EXISTS));
 
         if (dto.name() != null && !dto.name().isBlank()) {
-            history.setName(dto.name());
+            try {
+                history.setName(dto.name());
+                repo.save(history); // 변경 감지로도 가능하지만, save 호출해서 예외 포착 확실히
+            } catch (DataIntegrityViolationException e) {
+                throw new BusinessLogicException(GlobalErrorCode.HISTORY_NAME_EXISTS);
+            }
         }
         if (dto.folderId() != null) {
-            history.setFolderId(dto.folderId());
+            try {
+                history.setFolderId(dto.folderId());
+                repo.save(history); // 변경 감지로도 가능하지만, save 호출해서 예외 포착 확실히
+            } catch (DataIntegrityViolationException e) {
+                throw new BusinessLogicException(GlobalErrorCode.DUPLICATED_HISTORY_EXISTS);
+            }
         }
     }
     public void deleteHistory(String memberId, Long id) {
         E history = repo.findByIdAndMemberId(id, memberId)
-                .orElseThrow(() -> new EntityNotFoundException("히스토리를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessLogicException(GlobalErrorCode.HISTORY_NOT_EXISTS));
         repo.delete(history);
     }
     public HistoryContentResponseDTO readHistoryContent(String memberId, Long id) {
         E history = repo.findByIdAndMemberId(id, memberId)
-                .orElseThrow(() -> new EntityNotFoundException("히스토리를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessLogicException(GlobalErrorCode.HISTORY_NOT_EXISTS));
 
         return HistoryContentResponseDTO.builder()
                 .id(history.getId())
