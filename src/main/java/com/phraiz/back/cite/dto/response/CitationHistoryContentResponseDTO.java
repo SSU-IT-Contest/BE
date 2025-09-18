@@ -15,5 +15,5 @@ public class CitationHistoryContentResponseDTO {
     private String content;
     private LocalDateTime lastUpdate;
 
-    private Long citeId;
+    //private Long citeId;
 }
