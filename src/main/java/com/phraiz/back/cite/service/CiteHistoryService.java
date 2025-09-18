@@ -145,7 +145,7 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
                 .id(history.getId())
                 .content(history.getContent())
                 .lastUpdate(history.getLastUpdate())
-                .citeId(citeId) // ⭐ citeId를 추가
+              //  .citeId(citeId) // ⭐ citeId를 추가
                 .build();
     }
 

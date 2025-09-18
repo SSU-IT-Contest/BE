@@ -1,15 +1,21 @@
 package com.phraiz.back.common.security.jwt;
 
+import com.phraiz.back.common.exception.custom.InternalServerException;
+import com.phraiz.back.common.exception.GlobalErrorCode;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -35,18 +41,44 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try{
             if(token!=null && jwtUtil.validateToken(token)){ // 토큰 존재&유효
                 // 블랙리스트 토큰 검사 추가
-                String isLogout = redisTemplate.opsForValue().get(token);
-                if ("logout".equals(isLogout)) {
-                    // 이미 로그아웃된 토큰 → 인증 거부
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.getWriter().write("This token is logged out.");
-                    return;
+                try {
+                    String isLogout = redisTemplate.opsForValue().get(token);
+                    if ("logout".equals(isLogout)) {
+                        // 이미 로그아웃된 토큰 → 인증 거부
+                        throw new InternalServerException(GlobalErrorCode.AUTH_TOKEN_LOGGED_OUT);
+                    }
+                } catch (DataAccessException e) {
+                    throw new InternalServerException(GlobalErrorCode.AUTH_REDIS_ERROR, e);
                 }
+//                String isLogout = redisTemplate.opsForValue().get(token);
+//                if ("logout".equals(isLogout)) {
+//                    // 이미 로그아웃된 토큰 → 인증 거부
+//                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+//                    response.getWriter().write("This token is logged out.");
+//                    return;
+//                }
                 String id=jwtUtil.getSubjectFromToken(token); // 사용자 id 추출
-                UserDetails userDetails = userDetailsService.loadUserByUsername(id);
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()); // 시큐리티에서 사용하는 인증 객체 생성
-                authentication.setDetails(new WebAuthenticationDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authentication); // 현재 요청에 대해 "인증된 사용자" 로 등록
+                UserDetails userDetails;
+                try {
+                    userDetails = userDetailsService.loadUserByUsername(id);
+                } catch (UsernameNotFoundException e) {
+                    throw new InternalServerException(GlobalErrorCode.AUTH_USER_NOT_FOUND, e);
+                } catch (DataAccessException e) {
+                    throw new InternalServerException(GlobalErrorCode.DATABASE_ERROR, e);
+                } catch (Exception e) {
+                    throw new InternalServerException(GlobalErrorCode.AUTH_INTERNAL, e);
+                }
+                //UserDetails userDetails = userDetailsService.loadUserByUsername(id);
+                try {
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()); // 시큐리티에서 사용하는 인증 객체 생성
+                    authentication.setDetails(new WebAuthenticationDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authentication); // 현재 요청에 대해 "인증된 사용자" 로 등록
+                } catch (IllegalStateException e) {
+                    throw new InternalServerException(GlobalErrorCode.AUTH_SECURITY_CONTEXT_ERROR, e);
+                }
+//                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()); // 시큐리티에서 사용하는 인증 객체 생성
+//                authentication.setDetails(new WebAuthenticationDetails(request));
+//                SecurityContextHolder.getContext().setAuthentication(authentication); // 현재 요청에 대해 "인증된 사용자" 로 등록
         }
 
         filterChain.doFilter(request, response);
@@ -58,6 +90,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("Invalid access token.");
             return;
+        }catch (InternalServerException e) {
+            // 위에서 래핑한 예외는 그대로 전파
+            throw e;
         }
 
     }

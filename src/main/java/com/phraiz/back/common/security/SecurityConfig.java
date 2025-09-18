@@ -1,5 +1,6 @@
 package com.phraiz.back.common.security;
 
+import com.phraiz.back.common.filter.RequestLoggingFilter;
 import com.phraiz.back.common.security.jwt.JwtAuthenticationFilter;
 import com.phraiz.back.common.security.jwt.JwtUtil;
 import com.phraiz.back.common.security.oauth.CustomOAuth2SuccessHandler;
@@ -8,12 +9,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -46,7 +49,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain configure(HttpSecurity http) throws Exception {
         return http
-                .csrf(csrf->csrf.disable())
+                .csrf(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(request -> {
                     CorsConfiguration config = new CorsConfiguration();
                     config.setAllowedOrigins(List.of(
@@ -54,7 +59,7 @@ public class SecurityConfig {
                         "http://localhost:8080",
                         "https://ssu-phraiz-fe.vercel.app"
                     ));
-                    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
                     config.setAllowedHeaders(List.of("*"));
                     config.setExposedHeaders(List.of("Authorization")); // 프론트에서 Authorization 헤더 접근할 수 있도록
                     config.setAllowCredentials(true); // 쿠키 전달 허용
@@ -63,6 +68,7 @@ public class SecurityConfig {
                 .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorizeRequests ->authorizeRequests
                         // TODO 인증 없이 접근 허용한 부분
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/members/reissue","/api/members/signUp","/api/members/login","/api/members/findId", "/api/members/findPwd","/api/members/verifyResetToken","/api/members/resetPwd", "/api/members/checkId",
                                 "/api/members/emails/**", "/api/oauth/token",
                                 "/api/cite/**",
@@ -81,6 +87,7 @@ public class SecurityConfig {
                             userInfoEndpointConfig.userService(customOAuth2UserService))
                             .successHandler(customOAuth2SuccessHandler);
                 })
+                .addFilterBefore(new RequestLoggingFilter(), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userDetailsService,redisTemplate), UsernamePasswordAuthenticationFilter.class)
                 .build();
 
