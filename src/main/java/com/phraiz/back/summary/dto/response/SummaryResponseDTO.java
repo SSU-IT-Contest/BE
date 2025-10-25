@@ -12,4 +12,6 @@ public class SummaryResponseDTO {
     String result;
     long remainingToken;
 
+    String originalText;
+
 }

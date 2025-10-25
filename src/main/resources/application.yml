@@ -53,3 +53,10 @@ openai:
 
 zotero:
   url: ${ZOTERO_URL:http://localhost:1969/web}
+
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+

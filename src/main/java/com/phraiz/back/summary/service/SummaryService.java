@@ -16,9 +16,13 @@ import com.phraiz.back.summary.enums.SummaryPrompt;
 import com.phraiz.back.summary.exception.SummaryErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.YearMonth;
 
 @Service
@@ -130,6 +134,7 @@ public class SummaryService {
                 .name(metaDTO.name())
                 .result(result)
                 .remainingToken(remainingToken)
+                .originalText(summarizeRequestedText)
                 .build();
         return responseDTO;
     }
@@ -170,6 +175,66 @@ public class SummaryService {
         long after = tokenUsageService.incrementUsedTokens(memberId, month, increment);
         // 캐시 동기화(정합성 보장)
         redisService.incrementMonthlyUsage(memberId, month, increment);
+    }
+
+
+
+    /* ---------- 파일 업로드 ---------- */
+    public SummaryResponseDTO uploadFile(String memberId, MultipartFile file, String mode, String target, String question, Long historyId, Long folderId) {
+        String text = "";
+        // free 요금제 사용자는 사용 불가능
+        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Plan userPlan = Plan.fromId(member.getPlanId());
+        if(userPlan == Plan.FREE){
+            throw new BusinessLogicException(SummaryErrorCode.PLAN_NOT_ACCESSED);
+        }
+        // 업로드 파일 존재 여부 검사
+        if (file.isEmpty()) {
+            throw new BusinessLogicException(SummaryErrorCode.FILE_IS_EMPTY);
+        }
+        // 파일 확장자 검증
+        if (!file.getOriginalFilename().toLowerCase().endsWith(".pdf")) {
+            throw new BusinessLogicException(SummaryErrorCode.FILE_INVALID_FORMAT);
+        }
+
+        // 텍스트 추출
+        try (PDDocument document = PDDocument.load(file.getInputStream())) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            text = stripper.getText(document);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new BusinessLogicException(SummaryErrorCode.FILE_READ_FAILED);
+        }
+
+        // 선택된 요약 모드 확인
+        SummaryPrompt prompt;
+        try {
+            prompt = SummaryPrompt.valueOf(mode.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessLogicException(SummaryErrorCode.INVALID_MODE);
+        }
+
+        // 프롬프트에 삽입
+        if (prompt == SummaryPrompt.TARGETED){
+            SummaryRequestDTO requestDTO = SummaryRequestDTO.builder()
+                    .historyId(historyId)
+                    .folderId(folderId)
+                    .target(target)
+                    .text(text)
+                    .build();
+            return targetedSummary(memberId, requestDTO);
+        }else if (prompt == SummaryPrompt.QUESTION_BASED){
+            SummaryRequestDTO requestDTO = SummaryRequestDTO.builder()
+                    .historyId(historyId)
+                    .folderId(folderId)
+                    .question(question)
+                    .text(text)
+                    .build();
+            return targetedSummary(memberId, requestDTO);
+        }else {
+            return summary(memberId, text, prompt.getPrompt(),
+                    folderId, historyId);
+        }
     }
 
 }
