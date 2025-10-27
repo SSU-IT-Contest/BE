@@ -32,7 +32,8 @@ public abstract class BaseHistory{
     private Long folderId;  // 계층이 0 계층인 history의 경우, null
 
     @Lob
-    @Column(nullable = true)
+    //@Column(nullable = true)
+    @Column(name = "content", columnDefinition = "LONGTEXT")
     private String content;          // 5. 본문(대용량 텍스트 가능)
 
     @Column(name = "last_update", nullable = false)
