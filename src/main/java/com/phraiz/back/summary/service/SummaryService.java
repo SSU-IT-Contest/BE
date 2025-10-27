@@ -196,6 +196,11 @@ public class SummaryService {
         if (!file.getOriginalFilename().toLowerCase().endsWith(".pdf")) {
             throw new BusinessLogicException(SummaryErrorCode.FILE_INVALID_FORMAT);
         }
+        // 파일 용량 검사
+        if (file.getSize() > 20 * 1024 * 1024) { // 20MB 초과
+            throw new BusinessLogicException(SummaryErrorCode.FILE_TOO_LARGE);
+        }
+
 
         // 텍스트 추출
         try (PDDocument document = PDDocument.load(file.getInputStream())) {
