@@ -197,7 +197,7 @@ public class SummaryService {
             throw new BusinessLogicException(SummaryErrorCode.FILE_INVALID_FORMAT);
         }
         // 파일 용량 검사
-        if (file.getSize() > 20 * 1024 * 1024) { // 20MB 초과
+        if (file.getSize() > 2 * 1024 * 1024) { // 2MB 초과
             throw new BusinessLogicException(SummaryErrorCode.FILE_TOO_LARGE);
         }
 
