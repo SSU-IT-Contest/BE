@@ -10,5 +10,8 @@ public class SummaryResponseDTO {
     Long historyId;
     String name;
     String result;
+    long remainingToken;
+
+    String originalText;
 
 }

@@ -32,7 +32,20 @@ public enum GlobalErrorCode implements ErrorCode {
     AUTH_USER_NOT_FOUND(401, "AUTH006", "인증 대상 사용자를 찾을 수 없습니다.", "SECURITY"),
     AUTH_REDIS_ERROR(503, "AUTH007", "세션 검증 중 캐시 서버 오류가 발생했습니다.", "SECURITY"),
     AUTH_SECURITY_CONTEXT_ERROR(500, "AUTH008", "보안 컨텍스트 설정 중 오류가 발생했습니다.", "SECURITY"),
-    AUTH_INTERNAL(500, "AUTH999", "인증 처리 중 내부 오류가 발생했습니다.", "SECURITY");
+    AUTH_INTERNAL(500, "AUTH999", "인증 처리 중 내부 오류가 발생했습니다.", "SECURITY"),
+
+    //폴더 및 히스토리
+    FOLDER_NAME_EXISTS(400, "CLT001", "폴더 이름은 중복될 수 없습니다.", "FOLDER"),
+    FOLDER_NOT_EXISTS(400, "CLT002", "존재하지 않는 폴더입니다.", "FOLDER"),
+
+    HISTORY_NAME_EXISTS(400, "CLT003", "하나의 폴더에서 히스토리 이름은 중복될 수 없습니다.", "HISTORY"),
+    DUPLICATED_HISTORY_EXISTS(400, "CLD004", "해당 폴더에 히스토리 이름이 겹칩니다.", "HISTORY"),
+    HISTORY_NOT_EXISTS(400, "CLT004", "존재하지 않는 히스토리입니다.", "HISTORY"),
+
+    // 토큰 값 관련 오류
+    REDIS_TOKEN_VALUE_ERROR(500, "SYS005", "Redis에 저장된 사용량 값이 잘못되었습니다", "TOKEN")
+
+    ;
 
 
     private final int status;

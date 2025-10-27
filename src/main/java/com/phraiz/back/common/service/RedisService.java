@@ -1,5 +1,7 @@
 package com.phraiz.back.common.service;
 
+import com.phraiz.back.common.exception.GlobalErrorCode;
+import com.phraiz.back.common.exception.custom.InternalServerException;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -99,12 +101,7 @@ public class RedisService {
         try {
             return Long.parseLong(val);
         } catch (NumberFormatException e) {
-            /**
-             * Todo.
-             * Redis에 저장된 사용량 값이 잘못되었습니다 예외 던지기
-             */
-            log.error("🚨 Redis에 저장된 사용량 값이 잘못되었습니다. key={}, value={}", key, val);
-            return 0L; // 또는 throw new IllegalStateException(...)로 바꿔도 됩니다.
+            throw new InternalServerException(GlobalErrorCode.REDIS_TOKEN_VALUE_ERROR, "key=" + key + "val=" + val);
         }
     }
 

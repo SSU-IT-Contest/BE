@@ -18,7 +18,17 @@ public enum SummaryErrorCode implements ErrorCode {
 
     // 보안 위협
     CSRF_ATTACK_DETECTED(403, "SEC009", "위조된 요청이 감지되었습니다.", "SECURITY"),
-    UNAUTHORIZED_CLIENT(401, "SEC010", "인증되지 않은 클라이언트입니다.", "SECURITY");
+    UNAUTHORIZED_CLIENT(401, "SEC010", "인증되지 않은 클라이언트입니다.", "SECURITY"),
+
+    // 파일 관련
+    FILE_INVALID_FORMAT(400, "FILE401", "지원하지 않는 파일 형식입니다.", "FILE_PROCESS"),
+    FILE_IS_EMPTY(400, "FILE402", "업로드된 파일이 비어 있습니다.", "FILE_PROCESS"),
+    FILE_ENCRYPTED(400, "FILE403", "비밀번호로 보호된 파일은 처리할 수 없습니다.", "FILE_PROCESS"),
+    FILE_TEXT_EMPTY(400, "FILE404", "파일에서 유효한 텍스트를 추출하지 못했습니다.", "FILE_PROCESS"),
+    FILE_READ_FAILED(500, "FILE501", "파일을 읽는 도중 서버 오류가 발생했습니다.", "FILE_PROCESS"),
+
+    // 요약 모드 관련
+    INVALID_MODE(400, "SUMMARY401", "잘못된 요약 모드입니다.", "SUMMARY_PROCESS");
 
     private final int status;
     private final String code;

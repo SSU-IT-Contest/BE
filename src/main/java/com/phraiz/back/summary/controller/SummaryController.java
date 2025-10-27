@@ -1,11 +1,6 @@
 package com.phraiz.back.summary.controller;
 
-import com.phraiz.back.common.security.user.CustomUserDetails;
 import com.phraiz.back.common.util.SecurityUtil;
-import com.phraiz.back.member.domain.Member;
-import com.phraiz.back.paraphrase.dto.request.ParaphraseRequestDTO;
-import com.phraiz.back.paraphrase.dto.response.ParaphraseResponseDTO;
-import com.phraiz.back.paraphrase.service.ParaphraseService;
 import com.phraiz.back.common.dto.request.HistoryUpdateDTO;
 import com.phraiz.back.summary.dto.request.SummaryRequestDTO;
 import com.phraiz.back.common.dto.request.UpdateRequestDTO;
@@ -21,10 +16,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
-import org.springframework.lang.Nullable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequiredArgsConstructor
@@ -188,6 +181,22 @@ public class SummaryController {
     public HistoryContentResponseDTO getHistoryContent(@PathVariable Long historyId) {
         String memberId = SecurityUtil.getCurrentMemberId();
         return summaryHistoryService.readHistoryContent(memberId, historyId);
+    }
+
+
+
+
+    /* ---------- 파일 업로드 ---------- */
+    @PostMapping("/file-upload")
+    public ResponseEntity<?> extractTextFromPdf(@RequestPart("file") MultipartFile file,
+                                                @RequestPart("mode") String mode,
+                                                @RequestPart(value = "target", required = false) String target,
+                                                @RequestPart(value = "question", required = false) String question,
+                                                @RequestPart(value = "historyId", required = false) Long historyId,
+                                                @RequestPart(value = "folderId", required = false) Long folderId) {
+        String memberId = SecurityUtil.getCurrentMemberId();
+        SummaryResponseDTO result = summaryService.uploadFile(memberId, file, mode, target, question, historyId, folderId);
+        return ResponseEntity.ok(result);
     }
 }
 
