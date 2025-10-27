@@ -9,9 +9,9 @@ public class SummaryResponseDTO {
 
     Long historyId;
     String name;
-    String result;
+    String originalText;      // 원본 텍스트 추가
+    String summarizedText;    // result → summarizedText로 변경
+    Integer sequenceNumber;   // 몇 번째 content인지
     long remainingToken;
-
-    String originalText;
 
 }

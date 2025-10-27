@@ -75,23 +75,21 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
     }
 
     public HistoryMetaDTO saveOrUpdateHistory(String memberId,
-                                              Long folderId,      // 루트면 null
+                                              Long folderId,
                                               Long historyId,
-                                              String content, Cite cite ) {
+                                              String content, Cite cite) {
         // 1) UPDATE
         if (historyId != null) {
             CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
-                    .orElseThrow(() -> new EntityNotFoundException("히스토리를 찾을 수 없습니다."));
+                    .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
             history.setContent(content);
-            return new HistoryMetaDTO(history.getId(), history.getName());
+            return new HistoryMetaDTO(history.getId(), history.getName(), null);
         }
 
         // 2) CREATE
-        //String autoTitle = makeDefaultTitle(content);      // 본문 앞 30자 + "..." 등
-        // 원하는 형식: yyMMdd
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMdd");
-
         String autoTitle = cite.getCreatedAt().format(formatter) + "-" + "인용-" + cite.getCiteId();
+        
         CiteHistory newHistory = CiteHistory.builder()
                 .memberId(memberId)
                 .folderId(folderId)
@@ -101,51 +99,40 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
                 .build();
 
         repo.save(newHistory);
-        return new HistoryMetaDTO(newHistory.getId(), newHistory.getName());
-    }
-
-    private String makeDefaultTitle(String text) {
-        return (text.length() > 30 ? text.substring(0, 30) + "…" : text);
+        return new HistoryMetaDTO(newHistory.getId(), newHistory.getName(), null);
     }
 
     // ⭐ 새로운 인용문 히스토리를 생성하는 메서드 (외부 호출용)
     public void createCitationHistory(String memberId, Long folderId, String content, Long citeId) {
         validateRemainingHistoryCount(memberId);
 
-        // citeId로 Cite 엔티티를 조회합니다.
         Cite cite = citeRepository.findById(citeId)
                 .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.CITE_NOT_FOUND));
 
-        String autoTitle = makeDefaultTitle(content);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMdd");
+        String autoTitle = cite.getCreatedAt().format(formatter) + "-" + "인용-" + cite.getCiteId();
 
         CiteHistory newHistory = CiteHistory.builder()
                 .memberId(memberId)
                 .folderId(folderId)
                 .name(autoTitle)
                 .content(content)
-                .cite(cite) // ✅ Cite 객체로 관계 설정
+                .cite(cite)
                 .build();
 
         repo.save(newHistory);
-        new HistoryMetaDTO(newHistory.getId(), newHistory.getName());
-
     }
 
     public CitationHistoryContentResponseDTO readCitationHistoryContent(String memberId, Long id) {
-        // 1. 부모 클래스처럼 히스토리 엔티티를 찾습니다.
         CiteHistory history = repo.findByIdAndMemberId(id, memberId)
-                .orElseThrow(() -> new EntityNotFoundException("히스토리를 찾을 수 없습니다."));
+                .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
 
-        // 2. CiteHistory 엔티티에서 cite 객체에 접근하여 citeId를 가져옵니다.
-        // getCite()는 JPA 연관관계 매핑을 통해 Cite 엔티티를 반환합니다.
         Long citeId = history.getCite().getCiteId();
 
-        // 3. 빌더에 citeId를 추가하여 DTO 를 반환합니다.
         return CitationHistoryContentResponseDTO.builder()
                 .id(history.getId())
                 .content(history.getContent())
                 .lastUpdate(history.getLastUpdate())
-              //  .citeId(citeId) // ⭐ citeId를 추가
                 .build();
     }
 

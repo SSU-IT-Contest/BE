@@ -17,8 +17,11 @@ public enum CiteErrorCode implements ErrorCode {
 
     // 2. 인용 폴더 관련
     FOLDER_NOT_FOUND(404, "CIT002", "존재하지 않는 폴더입니다.", "CITATION"),
+    
+    // 3. 인용 히스토리 관련
+    HISTORY_NOT_FOUND(404, "CIT005", "존재하지 않는 인용 히스토리입니다.", "CITATION"),
 
-    // 3. 요금제 관련
+    // 4. 요금제 관련
     PLAN_NOT_ACCESSED(400, "CLT003", "무료 요금제 사용자는 이용하실 수 없습니다.", "CITATION"),
     PLAN_LIMIT_EXCEEDED(400, "CLT004", "무료 요금제 제한이 초과되었습니다. 요금제를 업데이트하세요.", "CITATION");
 
