@@ -55,6 +55,9 @@ dependencies {
 	// csl processor
 	implementation("de.undercouch:citeproc-java:3.0.0-beta.2")
 
+	// pdf upload
+	implementation("org.apache.pdfbox:pdfbox:2.0.27")
+
 }
 
 tasks.named('test') {
