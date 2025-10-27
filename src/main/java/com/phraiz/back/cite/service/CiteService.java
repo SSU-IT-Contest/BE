@@ -1,14 +1,10 @@
 package com.phraiz.back.cite.service;
 
 import com.phraiz.back.cite.domain.Cite;
-import com.phraiz.back.cite.domain.CiteFolder;
 import com.phraiz.back.cite.dto.request.CitationRequestDTO;
-import com.phraiz.back.cite.dto.request.RenameRequestDTO;
 import com.phraiz.back.cite.dto.response.CitationResponseDTO;
-import com.phraiz.back.cite.dto.response.FolderResponseDTO;
 import com.phraiz.back.cite.exception.CiteErrorCode;
 import com.phraiz.back.cite.repository.CiteRepository;
-import com.phraiz.back.common.dto.response.HistoryMetaDTO;
 import com.phraiz.back.common.exception.custom.BusinessLogicException;
 import com.phraiz.back.member.domain.Member;
 import lombok.RequiredArgsConstructor;
@@ -52,19 +48,18 @@ public class CiteService {
         cite.setCitation(citationRequestDTO.getCitation());
         cite.setStyle(citationRequestDTO.getStyle());
 
-        String result = citationRequestDTO.getCitation();
-        Long citeId = cite.getCiteId();
+        String citationText = citationRequestDTO.getCitation();
         Long folderId = citationRequestDTO.getFolderId();
         Long historyId = citationRequestDTO.getHistoryId();
 
-        // 내용 저장 (히스토리 업데이트)
-        HistoryMetaDTO metaDTO = citeHistoryService.saveOrUpdateHistory(  // ★
-                memberId,
-                folderId,      // 루트면 null
-                historyId,
-                result,      // content
-                cite
-        );
+        // 히스토리 처리
+        if (historyId != null) {
+            // 기존 히스토리에 content 추가
+            citeHistoryService.addContentToHistory(historyId, memberId, citationText);
+        } else {
+            // 새로운 히스토리 생성 및 content 추가
+            citeHistoryService.createCitationHistory(memberId, folderId, citationText, cite.getCiteId());
+        }
     }
 
     // 1-3. 인용문 조회
