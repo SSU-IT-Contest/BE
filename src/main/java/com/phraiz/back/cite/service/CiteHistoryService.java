@@ -87,19 +87,20 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
         // 1. 히스토리 개수 검증
         validateRemainingHistoryCount(memberId);
         
-        // 2. 제목 생성
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMdd");
-        String autoTitle = cite.getCreatedAt().format(formatter) + "-" + "인용-" + cite.getCiteId();
-        
-        // 3. 히스토리 생성 및 저장
+        // 2. 임시 제목으로 히스토리 생성
         CiteHistory newHistory = CiteHistory.builder()
                 .memberId(memberId)
                 .folderId(folderId)
-                .name(autoTitle)
+                .name("temp")
                 .cite(cite)
                 .build();
         
-        repo.save(newHistory);
+        repo.saveAndFlush(newHistory);
+        
+        // 3. 실제 제목 생성 및 설정 (history ID 사용)
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMdd");
+        String finalTitle = cite.getCreatedAt().format(formatter) + "-" + "인용-" + newHistory.getId();
+        newHistory.setName(finalTitle);
         
         return newHistory;
     }
