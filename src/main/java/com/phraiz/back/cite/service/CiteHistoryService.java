@@ -133,7 +133,6 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
                 .id(history.getId())
                 .content(history.getContent())
                 .lastUpdate(history.getLastUpdate())
-                .citeId(citeId)
                 .build();
     }
 
