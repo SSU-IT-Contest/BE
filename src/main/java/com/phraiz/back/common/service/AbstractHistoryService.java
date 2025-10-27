@@ -69,17 +69,8 @@ public abstract class AbstractHistoryService<E extends BaseHistory> {
                 .orElseThrow(() -> new BusinessLogicException(GlobalErrorCode.HISTORY_NOT_EXISTS));
         repo.delete(history);
     }
-    public HistoryContentResponseDTO readHistoryContent(String memberId, Long id) {
-        E history = repo.findByIdAndMemberId(id, memberId)
-                .orElseThrow(() -> new BusinessLogicException(GlobalErrorCode.HISTORY_NOT_EXISTS));
-
-        return HistoryContentResponseDTO.builder()
-                .id(history.getId())
-                .content(history.getContent())
-                .lastUpdate(history.getLastUpdate())
-                .build();
-    }
-
+    // readHistoryContent는 각 도메인별 HistoryService에서 Content 조회와 함께 구현
+    
     protected abstract HistoriesResponseDTO toDTO(E entity);
     protected abstract E newHistoryEntity(String memberId, Long folderId, String name);
     protected abstract void validateRemainingHistoryCount(String memberId);

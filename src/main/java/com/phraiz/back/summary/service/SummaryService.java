@@ -10,10 +10,14 @@ import com.phraiz.back.common.util.GptTokenUtil;
 import com.phraiz.back.member.domain.Member;
 import com.phraiz.back.member.exception.MemberErrorCode;
 import com.phraiz.back.member.repository.MemberRepository;
+import com.phraiz.back.summary.domain.SummaryContent;
+import com.phraiz.back.summary.domain.SummaryHistory;
 import com.phraiz.back.summary.dto.request.SummaryRequestDTO;
 import com.phraiz.back.summary.dto.response.SummaryResponseDTO;
 import com.phraiz.back.summary.enums.SummaryPrompt;
 import com.phraiz.back.summary.exception.SummaryErrorCode;
+import com.phraiz.back.summary.repository.SummaryContentRepository;
+import com.phraiz.back.summary.repository.SummaryHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,6 +34,8 @@ public class SummaryService {
     private final OpenAIService openAIService;
     private final RedisService redisService;
     private final SummaryHistoryService summaryHistoryService;
+    private final SummaryContentRepository summaryContentRepository;
+    private final SummaryHistoryRepository summaryHistoryRepository;
     private final MonthlyTokenUsageService tokenUsageService;
     private final MemberRepository memberRepository;
 
@@ -112,12 +118,13 @@ public class SummaryService {
         // 3. 요약 처리 (service 호출)
         String result = openAIService.callSummaryOpenAI(summarizeRequestedText, summarizeMode);
 
-        // 4. 내용 저장 (히스토리 업데이트)
-        HistoryMetaDTO metaDTO = summaryHistoryService.saveOrUpdateHistory(  // ★
+        // 4. 내용 저장 (Content로 저장)
+        HistoryMetaDTO metaDTO = saveSummaryContent(  // ★ 변경됨
                 memberId,
-                folderId,      // 루트면 null
+                folderId,
                 historyId,
-                result      // content
+                summarizeRequestedText,  // 원본 텍스트
+                result                    // 요약 결과
         );
 
         // 5. 사용량 업데이트
@@ -128,10 +135,54 @@ public class SummaryService {
         SummaryResponseDTO responseDTO = SummaryResponseDTO.builder()
                 .historyId(metaDTO.id())
                 .name(metaDTO.name())
-                .result(result)
+                .originalText(summarizeRequestedText)
+                .summarizedText(result)
+                .sequenceNumber(metaDTO.sequenceNumber())
                 .remainingToken(remainingToken)
                 .build();
         return responseDTO;
+    }
+    
+    // 4. Content 저장 로직
+    private HistoryMetaDTO saveSummaryContent(String memberId, Long folderId, Long historyId, 
+                                               String originalText, String summarizedText) {
+        SummaryHistory history;
+        Integer nextSequenceNumber;
+        
+        if (historyId != null) {
+            // 기존 히스토리에 content 추가
+            history = summaryHistoryRepository.findById(historyId)
+                    .orElseThrow(() -> new BusinessLogicException(SummaryErrorCode.HISTORY_NOT_FOUND));
+            
+            // 현재 content 개수 확인하여 다음 sequence number 계산
+            Long contentCount = summaryContentRepository.countByHistoryId(historyId);
+            nextSequenceNumber = contentCount.intValue() + 1;
+            
+            // 10개 초과 시 가장 오래된 content 삭제
+            if (contentCount >= 10) {
+                summaryContentRepository.findByHistoryIdOrderBySequenceNumberDesc(historyId)
+                        .stream()
+                        .skip(9)  // 최신 9개는 유지
+                        .forEach(summaryContentRepository::delete);
+            }
+        } else {
+            // 새 히스토리 생성
+            history = summaryHistoryService.createNewHistory(memberId, folderId);
+            nextSequenceNumber = 1;
+        }
+        
+        // Content 생성 및 저장
+        SummaryContent content = SummaryContent.builder()
+                .history(history)
+                .originalText(originalText)
+                .summarizedText(summarizedText)
+                .sequenceNumber(nextSequenceNumber)
+                .build();
+        
+        summaryContentRepository.save(content);
+        
+        // HistoryMetaDTO 반환
+        return new HistoryMetaDTO(history.getId(), history.getName(), nextSequenceNumber);
     }
 
     private long validateRemainingMonthlyTokens(String memberId, Plan plan, String text){

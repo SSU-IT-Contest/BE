@@ -15,6 +15,9 @@ public enum SummaryErrorCode implements ErrorCode {
 
     PLAN_NOT_ACCESSED(400, "CLT003", "무료 요금제 사용자는 이용하실 수 없습니다.", "SUMMARY"),
     PLAN_LIMIN_EXCEEDED(400, "CLT004", "무료 요금제 제한이 초과되었습니다. 요금제를 업데이트하세요.", "SUMMARY"),
+    
+    HISTORY_NOT_FOUND(404, "CLT005", "히스토리를 찾을 수 없습니다.", "SUMMARY"),
+    CONTENT_NOT_FOUND(404, "CLT006", "요청한 내용을 찾을 수 없습니다.", "SUMMARY"),
 
     // 보안 위협
     CSRF_ATTACK_DETECTED(403, "SEC009", "위조된 요청이 감지되었습니다.", "SECURITY"),
