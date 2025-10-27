@@ -230,7 +230,7 @@ public class SummaryService {
                     .question(question)
                     .text(text)
                     .build();
-            return targetedSummary(memberId, requestDTO);
+            return questionBasedSummary(memberId, requestDTO);
         }else {
             return summary(memberId, text, prompt.getPrompt(),
                     folderId, historyId);
