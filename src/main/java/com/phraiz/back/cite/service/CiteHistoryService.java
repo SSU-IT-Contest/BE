@@ -203,6 +203,8 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
                 .citationText(content.getCitationText())
                 .sequenceNumber(content.getSequenceNumber())
                 .lastUpdate(history.getLastUpdate())
+                .url(history.getCite().getUrl())
+                .style(history.getCite().getStyle())
                 .build();
     }
 }
