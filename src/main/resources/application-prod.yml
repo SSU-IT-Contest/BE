@@ -6,6 +6,14 @@ spring:
     url: ${PROD_DB_URL}
     username: ${PROD_DB_USERNAME}
     password: ${PROD_DB_PASSWORD}
+    # [Claude 제안] HikariCP 커넥션 풀 최적화 (Thread starvation 경고 해결)
+    # hikari:
+    #   maximum-pool-size: 5          # 커넥션 풀 크기 제한
+    #   minimum-idle: 2
+    #   connection-timeout: 30000      # 30초
+    #   idle-timeout: 600000           # 10분
+    #   max-lifetime: 1800000          # 30분
+    #   leak-detection-threshold: 60000 # 1분
 
 #  redis:
 #    host: ${REDIS_HOST}
@@ -15,8 +23,17 @@ spring:
     hibernate:
       ddl-auto: validate   # prod에서는 create/update 절대 금지!
     show-sql: false
+    # [Claude 제안] Hibernate 배치 처리 최적화
+    # properties:
+    #   hibernate:
+    #     jdbc:
+    #       batch_size: 20
+    #     order_inserts: true
+    #     order_updates: true
 
 logging:
   level:
     root: WARN
     com.phraiz.back: ERROR
+    # [Claude 제안] HikariCP 로그 레벨 추가
+    # com.zaxxer.hikari: WARN

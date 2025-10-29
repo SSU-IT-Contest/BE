@@ -191,11 +191,11 @@ public class SummaryController {
     /* ---------- 파일 업로드 ---------- */
     @PostMapping("/file-upload")
     public ResponseEntity<?> extractTextFromPdf(@RequestPart("file") MultipartFile file,
-                                                @RequestPart("mode") String mode,
-                                                @RequestPart(value = "target", required = false) String target,
-                                                @RequestPart(value = "question", required = false) String question,
-                                                @RequestPart(value = "historyId", required = false) Long historyId,
-                                                @RequestPart(value = "folderId", required = false) Long folderId) {
+                                                @RequestParam("mode") String mode,
+                                                @RequestParam(value = "target", required = false) String target,
+                                                @RequestParam(value = "question", required = false) String question,
+                                                @RequestParam(value = "historyId", required = false) Long historyId,
+                                                @RequestParam(value = "folderId", required = false) Long folderId) {
         String memberId = SecurityUtil.getCurrentMemberId();
         SummaryResponseDTO result = summaryService.uploadFile(memberId, file, mode, target, question, historyId, folderId);
         return ResponseEntity.ok(result);
