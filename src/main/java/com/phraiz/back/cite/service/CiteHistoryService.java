@@ -159,6 +159,29 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
     }
 
     /**
+     * 히스토리 ID로 folderId와 name을 조회하는 메서드
+     */
+    public HistoryInfo getHistoryInfo(Long historyId, String memberId) {
+        CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
+                .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
+        return new HistoryInfo(history.getFolderId(), history.getName());
+    }
+
+    // 히스토리 정보를 담는 record
+    public record HistoryInfo(Long folderId, String name) {}
+
+    /**
+     * 히스토리 ID로 folderId를 조회하는 메서드 (호환성 유지)
+     * @deprecated getHistoryInfo 사용 권장
+     */
+    @Deprecated
+    public Long getFolderIdByHistoryId(Long historyId, String memberId) {
+        CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
+                .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
+        return history.getFolderId();
+    }
+
+    /**
      * 특정 sequenceNumber의 content를 조회하는 메서드
      */
     public CitationHistoryContentResponseDTO readCitationHistoryContent(String memberId, Long historyId, Integer sequenceNumber) {

@@ -41,7 +41,7 @@ public class CiteService {
 
     // 1-2. 인용문과 스타일 저장
     @Transactional
-    public void saveCitation(String memberId, CitationRequestDTO citationRequestDTO) {
+    public SaveCitationResult saveCitation(String memberId, CitationRequestDTO citationRequestDTO) {
         Cite cite = citeRepository.findById(citationRequestDTO.getCiteId())
                 .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.CITE_NOT_FOUND));
 
@@ -52,13 +52,40 @@ public class CiteService {
         Long folderId = citationRequestDTO.getFolderId();
         Long historyId = citationRequestDTO.getHistoryId();
 
+        Long resultFolderId;
+        Long resultHistoryId;
+        String resultHistoryName;
+
         // 히스토리 처리
         if (historyId != null) {
             // 기존 히스토리에 content 추가
             citeHistoryService.addContentToHistory(historyId, memberId, citationText);
+            resultHistoryId = historyId;
+            // 기존 히스토리의 folderId와 name 조회
+            var historyInfo = citeHistoryService.getHistoryInfo(historyId, memberId);
+            resultFolderId = historyInfo.folderId();
+            resultHistoryName = historyInfo.name();
         } else {
             // 새로운 히스토리 생성 및 content 추가
-            citeHistoryService.createCitationHistory(memberId, folderId, citationText, cite.getCiteId());
+            var newHistory = citeHistoryService.createCitationHistory(memberId, folderId, citationText, cite.getCiteId());
+            resultHistoryId = newHistory.getId();
+            resultFolderId = newHistory.getFolderId();
+            resultHistoryName = newHistory.getName();
+        }
+
+        return new SaveCitationResult(resultFolderId, resultHistoryId, resultHistoryName);
+    }
+
+    // 내부 클래스로 결과 반환
+    public static class SaveCitationResult {
+        public final Long folderId;
+        public final Long historyId;
+        public final String historyName;
+
+        public SaveCitationResult(Long folderId, Long historyId, String historyName) {
+            this.folderId = folderId;
+            this.historyId = historyId;
+            this.historyName = historyName;
         }
     }
 
