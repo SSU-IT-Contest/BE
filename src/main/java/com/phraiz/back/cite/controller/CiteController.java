@@ -102,11 +102,16 @@ public class CiteController {
     @PostMapping("/getCitation")
     public ResponseEntity<Map<String, Object>> getCitation(@RequestBody CitationRequestDTO citationRequestDTO) {
         String memberId = SecurityUtil.getCurrentMemberId();
-        citeService.saveCitation(memberId, citationRequestDTO);
+        CiteService.SaveCitationResult result = citeService.saveCitation(memberId, citationRequestDTO);
+        
         Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "인용문 저장 완료");
-        log.info("[getCitation] 인용문 저장 완료");
+        response.put("status", 200);
+        response.put("folderId", result.folderId);
+        response.put("historyId", result.historyId);
+        response.put("historyName", result.historyName);
+        
+        log.info("[getCitation] 인용문 저장 완료 - folderId: {}, historyId: {}, historyName: {}", 
+                 result.folderId, result.historyId, result.historyName);
         return ResponseEntity.ok(response);
     }
 
