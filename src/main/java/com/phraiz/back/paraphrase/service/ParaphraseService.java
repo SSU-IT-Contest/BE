@@ -10,10 +10,14 @@ import com.phraiz.back.common.util.GptTokenUtil;
 import com.phraiz.back.member.domain.Member;
 import com.phraiz.back.member.exception.MemberErrorCode;
 import com.phraiz.back.member.repository.MemberRepository;
+import com.phraiz.back.paraphrase.domain.ParaphraseContent;
+import com.phraiz.back.paraphrase.domain.ParaphraseHistory;
 import com.phraiz.back.paraphrase.dto.request.ParaphraseRequestDTO;
 import com.phraiz.back.paraphrase.dto.response.ParaphraseResponseDTO;
 import com.phraiz.back.paraphrase.enums.ParaphrasePrompt;
 import com.phraiz.back.paraphrase.exception.ParaphraseErrorCode;
+import com.phraiz.back.paraphrase.repository.ParaphraseContentRepository;
+import com.phraiz.back.paraphrase.repository.ParaphraseHistoryRepository;
 import com.phraiz.back.summary.exception.SummaryErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +36,8 @@ public class ParaphraseService {
     private final OpenAIService openAIService;
     private final RedisService redisService;
     private final ParaphraseHistoryService paraphraseHistoryService;
+    private final ParaphraseContentRepository paraphraseContentRepository;
+    private final ParaphraseHistoryRepository paraphraseHistoryRepository;
     private final MonthlyTokenUsageService tokenUsageService;
     private final MemberRepository memberRepository;
 
@@ -95,12 +101,13 @@ public class ParaphraseService {
         // 3. paraphrase 처리 (service 호출)
         String result = openAIService.callParaphraseOpenAI(paraphraseRequestedText, paraphraseMode, scale);
 
-        // 4. 내용 저장 (히스토리 업데이트)
-        HistoryMetaDTO metaDTO = paraphraseHistoryService.saveOrUpdateHistory(  // ★
+        // 4. 내용 저장 (Content로 저장)
+        HistoryMetaDTO metaDTO = saveParaphraseContent(  // ★ 변경됨
                 memberId,
-                folderId,      // 루트면 null
+                folderId,
                 historyId,
-                result      // content
+                paraphraseRequestedText,  // 원본 텍스트
+                result                     // 패러프레이징 결과
         );
 
         // 5. 사용량 업데이트
@@ -111,10 +118,54 @@ public class ParaphraseService {
         ParaphraseResponseDTO responseDTO = ParaphraseResponseDTO.builder()
                 .resultHistoryId(metaDTO.id())
                 .name(metaDTO.name())
-                .result(result)
+                .originalText(paraphraseRequestedText)
+                .paraphrasedText(result)
+                .sequenceNumber(metaDTO.sequenceNumber())
                 .remainingToken(remainingToken)
                 .build();
         return responseDTO;
+    }
+    
+    // 4. Content 저장 로직
+    private HistoryMetaDTO saveParaphraseContent(String memberId, Long folderId, Long historyId, 
+                                                  String originalText, String paraphrasedText) {
+        ParaphraseHistory history;
+        Integer nextSequenceNumber;
+        
+        if (historyId != null) {
+            // 기존 히스토리에 content 추가
+            history = paraphraseHistoryRepository.findById(historyId)
+                    .orElseThrow(() -> new BusinessLogicException(ParaphraseErrorCode.HISTORY_NOT_FOUND));
+            
+            // 현재 content 개수 확인하여 다음 sequence number 계산
+            Long contentCount = paraphraseContentRepository.countByHistoryId(historyId);
+            nextSequenceNumber = contentCount.intValue() + 1;
+            
+            // 10개 초과 시 가장 오래된 content 삭제
+            if (contentCount >= 10) {
+                paraphraseContentRepository.findByHistoryIdOrderBySequenceNumberDesc(historyId)
+                        .stream()
+                        .skip(9)  // 최신 9개는 유지
+                        .forEach(paraphraseContentRepository::delete);
+            }
+        } else {
+            // 새 히스토리 생성
+            history = paraphraseHistoryService.createNewHistory(memberId, folderId);
+            nextSequenceNumber = 1;
+        }
+        
+        // Content 생성 및 저장
+        ParaphraseContent content = ParaphraseContent.builder()
+                .history(history)
+                .originalText(originalText)
+                .paraphrasedText(paraphrasedText)
+                .sequenceNumber(nextSequenceNumber)
+                .build();
+        
+        paraphraseContentRepository.save(content);
+        
+        // HistoryMetaDTO 반환
+        return new HistoryMetaDTO(history.getId(), history.getName(), nextSequenceNumber);
     }
 
     private long validateRemainingMonthlyTokens(String memberId, Plan plan, String text){

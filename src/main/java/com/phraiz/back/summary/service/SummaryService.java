@@ -10,15 +10,23 @@ import com.phraiz.back.common.util.GptTokenUtil;
 import com.phraiz.back.member.domain.Member;
 import com.phraiz.back.member.exception.MemberErrorCode;
 import com.phraiz.back.member.repository.MemberRepository;
+import com.phraiz.back.summary.domain.SummaryContent;
+import com.phraiz.back.summary.domain.SummaryHistory;
 import com.phraiz.back.summary.dto.request.SummaryRequestDTO;
 import com.phraiz.back.summary.dto.response.SummaryResponseDTO;
 import com.phraiz.back.summary.enums.SummaryPrompt;
 import com.phraiz.back.summary.exception.SummaryErrorCode;
+import com.phraiz.back.summary.repository.SummaryContentRepository;
+import com.phraiz.back.summary.repository.SummaryHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.YearMonth;
 
 @Service
@@ -30,6 +38,8 @@ public class SummaryService {
     private final OpenAIService openAIService;
     private final RedisService redisService;
     private final SummaryHistoryService summaryHistoryService;
+    private final SummaryContentRepository summaryContentRepository;
+    private final SummaryHistoryRepository summaryHistoryRepository;
     private final MonthlyTokenUsageService tokenUsageService;
     private final MemberRepository memberRepository;
 
@@ -112,12 +122,13 @@ public class SummaryService {
         // 3. 요약 처리 (service 호출)
         String result = openAIService.callSummaryOpenAI(summarizeRequestedText, summarizeMode);
 
-        // 4. 내용 저장 (히스토리 업데이트)
-        HistoryMetaDTO metaDTO = summaryHistoryService.saveOrUpdateHistory(  // ★
+        // 4. 내용 저장 (Content로 저장)
+        HistoryMetaDTO metaDTO = saveSummaryContent(  // ★ 변경됨
                 memberId,
-                folderId,      // 루트면 null
+                folderId,
                 historyId,
-                result      // content
+                summarizeRequestedText,  // 원본 텍스트
+                result                    // 요약 결과
         );
 
         // 5. 사용량 업데이트
@@ -128,10 +139,54 @@ public class SummaryService {
         SummaryResponseDTO responseDTO = SummaryResponseDTO.builder()
                 .historyId(metaDTO.id())
                 .name(metaDTO.name())
-                .result(result)
+                .originalText(summarizeRequestedText)
+                .summarizedText(result)
+                .sequenceNumber(metaDTO.sequenceNumber())
                 .remainingToken(remainingToken)
                 .build();
         return responseDTO;
+    }
+    
+    // 4. Content 저장 로직
+    private HistoryMetaDTO saveSummaryContent(String memberId, Long folderId, Long historyId, 
+                                               String originalText, String summarizedText) {
+        SummaryHistory history;
+        Integer nextSequenceNumber;
+        
+        if (historyId != null) {
+            // 기존 히스토리에 content 추가
+            history = summaryHistoryRepository.findById(historyId)
+                    .orElseThrow(() -> new BusinessLogicException(SummaryErrorCode.HISTORY_NOT_FOUND));
+            
+            // 현재 content 개수 확인하여 다음 sequence number 계산
+            Long contentCount = summaryContentRepository.countByHistoryId(historyId);
+            nextSequenceNumber = contentCount.intValue() + 1;
+            
+            // 10개 초과 시 가장 오래된 content 삭제
+            if (contentCount >= 10) {
+                summaryContentRepository.findByHistoryIdOrderBySequenceNumberDesc(historyId)
+                        .stream()
+                        .skip(9)  // 최신 9개는 유지
+                        .forEach(summaryContentRepository::delete);
+            }
+        } else {
+            // 새 히스토리 생성
+            history = summaryHistoryService.createNewHistory(memberId, folderId);
+            nextSequenceNumber = 1;
+        }
+        
+        // Content 생성 및 저장
+        SummaryContent content = SummaryContent.builder()
+                .history(history)
+                .originalText(originalText)
+                .summarizedText(summarizedText)
+                .sequenceNumber(nextSequenceNumber)
+                .build();
+        
+        summaryContentRepository.save(content);
+        
+        // HistoryMetaDTO 반환
+        return new HistoryMetaDTO(history.getId(), history.getName(), nextSequenceNumber);
     }
 
     private long validateRemainingMonthlyTokens(String memberId, Plan plan, String text){
@@ -170,6 +225,71 @@ public class SummaryService {
         long after = tokenUsageService.incrementUsedTokens(memberId, month, increment);
         // 캐시 동기화(정합성 보장)
         redisService.incrementMonthlyUsage(memberId, month, increment);
+    }
+
+
+
+    /* ---------- 파일 업로드 ---------- */
+    public SummaryResponseDTO uploadFile(String memberId, MultipartFile file, String mode, String target, String question, Long historyId, Long folderId) {
+        String text = "";
+        // free 요금제 사용자는 사용 불가능
+        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Plan userPlan = Plan.fromId(member.getPlanId());
+        if(userPlan == Plan.FREE){
+            throw new BusinessLogicException(SummaryErrorCode.PLAN_NOT_ACCESSED);
+        }
+        // 업로드 파일 존재 여부 검사
+        if (file.isEmpty()) {
+            throw new BusinessLogicException(SummaryErrorCode.FILE_IS_EMPTY);
+        }
+        // 파일 확장자 검증
+        if (!file.getOriginalFilename().toLowerCase().endsWith(".pdf")) {
+            throw new BusinessLogicException(SummaryErrorCode.FILE_INVALID_FORMAT);
+        }
+        // 파일 용량 검사
+        if (file.getSize() > 2 * 1024 * 1024) { // 2MB 초과
+            throw new BusinessLogicException(SummaryErrorCode.FILE_TOO_LARGE);
+        }
+
+
+        // 텍스트 추출
+        try (PDDocument document = PDDocument.load(file.getInputStream())) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            text = stripper.getText(document);
+        } catch (IOException e) {
+            e.printStackTrace();
+            throw new BusinessLogicException(SummaryErrorCode.FILE_READ_FAILED);
+        }
+
+        // 선택된 요약 모드 확인
+        SummaryPrompt prompt;
+        try {
+            prompt = SummaryPrompt.valueOf(mode.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessLogicException(SummaryErrorCode.INVALID_MODE);
+        }
+
+        // 프롬프트에 삽입
+        if (prompt == SummaryPrompt.TARGETED){
+            SummaryRequestDTO requestDTO = SummaryRequestDTO.builder()
+                    .historyId(historyId)
+                    .folderId(folderId)
+                    .target(target)
+                    .text(text)
+                    .build();
+            return targetedSummary(memberId, requestDTO);
+        }else if (prompt == SummaryPrompt.QUESTION_BASED){
+            SummaryRequestDTO requestDTO = SummaryRequestDTO.builder()
+                    .historyId(historyId)
+                    .folderId(folderId)
+                    .question(question)
+                    .text(text)
+                    .build();
+            return questionBasedSummary(memberId, requestDTO);
+        }else {
+            return summary(memberId, text, prompt.getPrompt(),
+                    folderId, historyId);
+        }
     }
 
 }

@@ -102,11 +102,16 @@ public class CiteController {
     @PostMapping("/getCitation")
     public ResponseEntity<Map<String, Object>> getCitation(@RequestBody CitationRequestDTO citationRequestDTO) {
         String memberId = SecurityUtil.getCurrentMemberId();
-        citeService.saveCitation(memberId, citationRequestDTO);
+        CiteService.SaveCitationResult result = citeService.saveCitation(memberId, citationRequestDTO);
+        
         Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "인용문 저장 완료");
-        log.info("[getCitation] 인용문 저장 완료");
+        response.put("status", 200);
+        response.put("folderId", result.folderId);
+        response.put("historyId", result.historyId);
+        response.put("historyName", result.historyName);
+        
+        log.info("[getCitation] 인용문 저장 완료 - folderId: {}, historyId: {}, historyName: {}", 
+                 result.folderId, result.historyId, result.historyName);
         return ResponseEntity.ok(response);
     }
 
@@ -168,7 +173,6 @@ public class CiteController {
         return citeHistoryService.getHistories(memberId, folderId, page, size);
     }
 
-    // 3-2. 새로운 히스토리 생성 후 cite 생성 요청
     // 3-2. 히스토리 생성
     @PostMapping("/histories")
     public ResponseEntity<Void> createHistory(@RequestParam(required = false) Long folderId,
@@ -177,14 +181,6 @@ public class CiteController {
         citeHistoryService.createHistory(memberId, folderId, dto.name());
         return ResponseEntity.ok().build();
     }
-//    @PostMapping("/histories")
-//    public ResponseEntity<Void> createHistory(@RequestParam(required = false) Long folderId,
-//                                              @RequestBody CitationUpdateRequestDTO dto) {
-//
-//        String memberId = SecurityUtil.getCurrentMemberId();
-//        citeHistoryService.createCitationHistory(memberId, folderId, dto.name(), dto.citeId());
-//        return ResponseEntity.ok().build();
-//    }
 
     // 3-3. 히스토리 이동 및 이름 수정(폴더 변경) -- PATCH 하나로 처리
     @PatchMapping("/histories/{historyId}")
@@ -203,12 +199,12 @@ public class CiteController {
         return ResponseEntity.ok().build();
     }
 
-    // 3-5. 히스토리 최신 내용 조회
-    @GetMapping("/histories/{historyId}/latest")
-    public CitationHistoryContentResponseDTO getHistoryContent(@PathVariable Long historyId) {
+    // 3-5. 히스토리 특정 content 조회 (sequenceNumber로 조회, 없으면 최신 조회)
+    @GetMapping("/histories/{historyId}")
+    public CitationHistoryContentResponseDTO getHistoryContent(
+            @PathVariable Long historyId,
+            @RequestParam(required = false) Integer sequenceNumber) {
         String memberId = SecurityUtil.getCurrentMemberId();
-        return citeHistoryService.readCitationHistoryContent(memberId, historyId);
+        return citeHistoryService.readCitationHistoryContent(memberId, historyId, sequenceNumber);
     }
-
-
 }

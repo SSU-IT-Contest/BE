@@ -1,9 +1,11 @@
 package com.phraiz.back.cite.service;
 
 import com.phraiz.back.cite.domain.Cite;
+import com.phraiz.back.cite.domain.CiteContent;
 import com.phraiz.back.cite.domain.CiteHistory;
 import com.phraiz.back.cite.dto.response.CitationHistoryContentResponseDTO;
 import com.phraiz.back.cite.exception.CiteErrorCode;
+import com.phraiz.back.cite.repository.CiteContentRepository;
 import com.phraiz.back.cite.repository.CiteRepository;
 import com.phraiz.back.common.dto.response.HistoriesResponseDTO;
 import com.phraiz.back.common.dto.response.HistoryMetaDTO;
@@ -14,7 +16,6 @@ import com.phraiz.back.common.service.AbstractHistoryService;
 import com.phraiz.back.member.domain.Member;
 import com.phraiz.back.member.exception.MemberErrorCode;
 import com.phraiz.back.member.repository.MemberRepository;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,13 +30,18 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
 
     private final MemberRepository memberRepository;
     private final CiteRepository citeRepository;
+    private final CiteContentRepository citeContentRepository;
 
     private final int MAX_HISTORY_FOR_FREE = 30;
 
-    protected CiteHistoryService(BaseHistoryRepository<CiteHistory> repo, MemberRepository memberRepository, CiteRepository citeRepository) {
+    protected CiteHistoryService(BaseHistoryRepository<CiteHistory> repo, 
+                                 MemberRepository memberRepository, 
+                                 CiteRepository citeRepository,
+                                 CiteContentRepository citeContentRepository) {
         super(repo);
         this.memberRepository = memberRepository;
         this.citeRepository = citeRepository;
+        this.citeContentRepository = citeContentRepository;
     }
 
     @Override
@@ -62,91 +68,141 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
 
     @Override
     protected void validateRemainingHistoryCount(String memberId) {
-        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
         Plan userPlan = Plan.fromId(member.getPlanId());
         if(userPlan == Plan.FREE){
-            // 히스토리 개수 불러오기. 30개 이하인 경우, true return.
-            long currentCount = repo.countByMemberId(memberId);   // ← 여기!
-
+            long currentCount = repo.countByMemberId(memberId);
             if (currentCount >= MAX_HISTORY_FOR_FREE) {
                 throw new BusinessLogicException(CiteErrorCode.PLAN_LIMIT_EXCEEDED);
             }
         }
     }
 
-    public HistoryMetaDTO saveOrUpdateHistory(String memberId,
-                                              Long folderId,      // 루트면 null
-                                              Long historyId,
-                                              String content, Cite cite ) {
-        // 1) UPDATE
-        if (historyId != null) {
-            CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
-                    .orElseThrow(() -> new EntityNotFoundException("히스토리를 찾을 수 없습니다."));
-            history.setContent(content);
-            return new HistoryMetaDTO(history.getId(), history.getName());
-        }
-
-        // 2) CREATE
-        //String autoTitle = makeDefaultTitle(content);      // 본문 앞 30자 + "..." 등
-        // 원하는 형식: yyMMdd
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMdd");
-
-        String autoTitle = cite.getCreatedAt().format(formatter) + "-" + "인용-" + cite.getCiteId();
+    /**
+     * 새로운 히스토리를 생성하는 메서드 (CiteService에서 사용)
+     * ParaphraseHistoryService 구조 참고 - 히스토리 생성만 담당
+     */
+    public CiteHistory createNewHistory(String memberId, Long folderId, Cite cite) {
+        // 1. 히스토리 개수 검증
+        validateRemainingHistoryCount(memberId);
+        
+        // 2. 임시 제목으로 히스토리 생성
         CiteHistory newHistory = CiteHistory.builder()
                 .memberId(memberId)
                 .folderId(folderId)
-                .name(autoTitle)
-                .content(content)
+                .name("temp")
                 .cite(cite)
                 .build();
-
-        repo.save(newHistory);
-        return new HistoryMetaDTO(newHistory.getId(), newHistory.getName());
+        
+        repo.saveAndFlush(newHistory);
+        
+        // 3. 실제 제목 생성 및 설정 (history ID 사용)
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyMMdd");
+        String finalTitle = cite.getCreatedAt().format(formatter) + "-" + "인용-" + newHistory.getId();
+        newHistory.setName(finalTitle);
+        
+        return newHistory;
+    }
+    
+    /**
+     * 기존 히스토리에 새로운 content를 추가하는 메서드
+     */
+    public Integer addContentToHistory(Long historyId, String memberId, String citationText) {
+        CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
+                .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
+        
+        // 새로운 sequenceNumber 계산 (가장 최근 content의 sequenceNumber + 1)
+        Integer nextSeqNum = citeContentRepository.findMaxSequenceNumberByHistoryId(historyId)
+                .map(max -> max + 1)
+                .orElse(1);
+        
+        // content 테이블에 새로운 레코드 추가
+        CiteContent newContent = CiteContent.builder()
+                .history(history)
+                .citationText(citationText)
+                .sequenceNumber(nextSeqNum)
+                .build();
+        
+        history.addContent(newContent);
+        citeContentRepository.save(newContent);
+        
+        // 10개로 제한
+        history.limitContentsToTen();
+        
+        return nextSeqNum;
     }
 
-    private String makeDefaultTitle(String text) {
-        return (text.length() > 30 ? text.substring(0, 30) + "…" : text);
-    }
-
-    // ⭐ 새로운 인용문 히스토리를 생성하는 메서드 (외부 호출용)
-    public void createCitationHistory(String memberId, Long folderId, String content, Long citeId) {
-        validateRemainingHistoryCount(memberId);
-
-        // citeId로 Cite 엔티티를 조회합니다.
+    /**
+     * 새로운 인용문 히스토리를 생성하고 첨 번째 content를 추가하는 메서드 (외부 호출용)
+     * createNewHistory와 addContentToHistory를 결합하여 사용
+     */
+    public CiteHistory createCitationHistory(String memberId, Long folderId, String citationText, Long citeId) {
+        // 1. Cite 조회
         Cite cite = citeRepository.findById(citeId)
                 .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.CITE_NOT_FOUND));
-
-        String autoTitle = makeDefaultTitle(content);
-
-        CiteHistory newHistory = CiteHistory.builder()
-                .memberId(memberId)
-                .folderId(folderId)
-                .name(autoTitle)
-                .content(content)
-                .cite(cite) // ✅ Cite 객체로 관계 설정
+        
+        // 2. 히스토리 생성
+        CiteHistory newHistory = createNewHistory(memberId, folderId, cite);
+        
+        // 3. 첨 번째 content 추가
+        CiteContent firstContent = CiteContent.builder()
+                .history(newHistory)
+                .citationText(citationText)
+                .sequenceNumber(1)
                 .build();
-
-        repo.save(newHistory);
-        new HistoryMetaDTO(newHistory.getId(), newHistory.getName());
-
+        
+        newHistory.addContent(firstContent);
+        citeContentRepository.save(firstContent);
+        
+        return newHistory;
     }
 
-    public CitationHistoryContentResponseDTO readCitationHistoryContent(String memberId, Long id) {
-        // 1. 부모 클래스처럼 히스토리 엔티티를 찾습니다.
-        CiteHistory history = repo.findByIdAndMemberId(id, memberId)
-                .orElseThrow(() -> new EntityNotFoundException("히스토리를 찾을 수 없습니다."));
+    /**
+     * 히스토리 ID로 folderId와 name을 조회하는 메서드
+     */
+    public HistoryInfo getHistoryInfo(Long historyId, String memberId) {
+        CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
+                .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
+        return new HistoryInfo(history.getFolderId(), history.getName());
+    }
 
-        // 2. CiteHistory 엔티티에서 cite 객체에 접근하여 citeId를 가져옵니다.
-        // getCite()는 JPA 연관관계 매핑을 통해 Cite 엔티티를 반환합니다.
-        Long citeId = history.getCite().getCiteId();
+    // 히스토리 정보를 담는 record
+    public record HistoryInfo(Long folderId, String name) {}
 
-        // 3. 빌더에 citeId를 추가하여 DTO 를 반환합니다.
+    /**
+     * 히스토리 ID로 folderId를 조회하는 메서드 (호환성 유지)
+     * @deprecated getHistoryInfo 사용 권장
+     */
+    @Deprecated
+    public Long getFolderIdByHistoryId(Long historyId, String memberId) {
+        CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
+                .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
+        return history.getFolderId();
+    }
+
+    /**
+     * 특정 sequenceNumber의 content를 조회하는 메서드
+     */
+    public CitationHistoryContentResponseDTO readCitationHistoryContent(String memberId, Long historyId, Integer sequenceNumber) {
+        CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
+                .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
+
+        // sequenceNumber가 제공되면 해당 content를 조회, 아니면 가장 최근 content 조회
+        CiteContent content;
+        if (sequenceNumber != null) {
+            content = citeContentRepository.findByHistoryIdAndSequenceNumber(historyId, sequenceNumber)
+                    .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.CONTENT_NOT_FOUND));
+        } else {
+            content = citeContentRepository.findFirstByHistoryIdOrderBySequenceNumberDesc(historyId)
+                    .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.CONTENT_NOT_FOUND));
+        }
+
         return CitationHistoryContentResponseDTO.builder()
                 .id(history.getId())
-                .content(history.getContent())
+                .citationText(content.getCitationText())
+                .sequenceNumber(content.getSequenceNumber())
                 .lastUpdate(history.getLastUpdate())
-              //  .citeId(citeId) // ⭐ citeId를 추가
                 .build();
     }
-
 }
