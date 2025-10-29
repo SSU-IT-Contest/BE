@@ -12,8 +12,10 @@ import java.time.LocalDateTime;
 public class CitationHistoryContentResponseDTO {
 
     private Long id;
-    private String content;
+    private String citationText;  // content -> citationText로 변경
+    private Integer sequenceNumber;  // sequenceNumber 추가
     private LocalDateTime lastUpdate;
 
-    //private Long citeId;
+    private String style;
+    private String url;
 }

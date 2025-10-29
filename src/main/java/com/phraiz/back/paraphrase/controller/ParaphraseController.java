@@ -173,11 +173,13 @@ public class ParaphraseController {
         return ResponseEntity.ok().build();
     }
 
-    // 3-5. 히스토리 최신 내용 조회
-    @GetMapping("/histories/{historyId}/latest")
-    public HistoryContentResponseDTO getHistoryContent(@PathVariable Long historyId) {
+    // 3-5. 히스토리 특정 content 조회 (sequenceNumber로 조회, 없으면 최신 조회)
+    @GetMapping("/histories/{historyId}")
+    public ParaphraseResponseDTO getHistoryContent(
+            @PathVariable Long historyId,
+            @RequestParam(required = false) Integer sequenceNumber) {
         String memberId = SecurityUtil.getCurrentMemberId();
-        return paraphraseHistoryService.readHistoryContent(memberId, historyId);
+        return paraphraseHistoryService.readHistoryContent(memberId, historyId, sequenceNumber);
     }
 
 

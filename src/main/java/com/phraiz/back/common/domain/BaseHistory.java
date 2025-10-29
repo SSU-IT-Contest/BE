@@ -31,10 +31,7 @@ public abstract class BaseHistory{
     @Column(name = "folder_id", nullable = true)
     private Long folderId;  // 계층이 0 계층인 history의 경우, null
 
-    @Lob
-    //@Column(nullable = true)
-    @Column(name = "content", columnDefinition = "LONGTEXT")
-    private String content;          // 5. 본문(대용량 텍스트 가능)
+    // content 필드 제거 - 별도의 Content 엔티티로 관리
 
     @Column(name = "last_update", nullable = false)
     private LocalDateTime lastUpdate; // 6. 최종 수정 시각
