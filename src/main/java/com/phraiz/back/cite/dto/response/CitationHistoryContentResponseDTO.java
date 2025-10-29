@@ -15,4 +15,7 @@ public class CitationHistoryContentResponseDTO {
     private String citationText;  // content -> citationText로 변경
     private Integer sequenceNumber;  // sequenceNumber 추가
     private LocalDateTime lastUpdate;
+
+    private String style;
+    private String url;
 }
