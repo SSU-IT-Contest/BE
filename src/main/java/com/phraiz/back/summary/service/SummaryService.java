@@ -264,7 +264,8 @@ public class SummaryService {
         // 선택된 요약 모드 확인
         SummaryPrompt prompt;
         try {
-            prompt = SummaryPrompt.valueOf(mode.toUpperCase());
+            // "one-line" -> "ONE_LINE" 변환
+            prompt = SummaryPrompt.valueOf(mode.toUpperCase().replace("-", "_"));
         } catch (IllegalArgumentException e) {
             throw new BusinessLogicException(SummaryErrorCode.INVALID_MODE);
         }
