@@ -57,7 +57,8 @@ public class SecurityConfig {
                     config.setAllowedOrigins(List.of(
                         "http://localhost:3000",
                         "http://localhost:8080",
-                        "https://ssu-phraiz-fe.vercel.app"
+                        "https://ssu-phraiz-fe.vercel.app",
+                        "https://www.phraiz.com"
                     ));
                     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
                     config.setAllowedHeaders(List.of("*"));
