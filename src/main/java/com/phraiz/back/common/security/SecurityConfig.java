@@ -74,6 +74,7 @@ public class SecurityConfig {
                                 "/api/members/emails/**", "/api/oauth/token",
                                 "/api/cite/**",
                                 "/api/paraphrase/**", "/api/summary/**",
+                                "/login/oauth2/**",
                                 "/oauth2/**").permitAll()
 
                         // .requestMatchers("/api/cite/**").authenticated()  //  로그인 필수
@@ -84,8 +85,13 @@ public class SecurityConfig {
                 .oauth2Login((oauth2Login) ->{
                     oauth2Login
                           //  .loginPage("/login")
+                            .authorizationEndpoint(auth ->
+                                    auth.baseUri("/oauth2/authorization"))
+
+                            .redirectionEndpoint(redirect ->
+                                    redirect.baseUri("/login/oauth2/code/*"))
                             .userInfoEndpoint(userInfoEndpointConfig ->
-                            userInfoEndpointConfig.userService(customOAuth2UserService))
+                                    userInfoEndpointConfig.userService(customOAuth2UserService))
                             .successHandler(customOAuth2SuccessHandler);
                 })
                 .addFilterBefore(new RequestLoggingFilter(), UsernamePasswordAuthenticationFilter.class)
