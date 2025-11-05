@@ -56,7 +56,7 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
 //        String redirectUrl = "https://ssu-phraiz-fe.vercel.app/oauth2/callback" +
 //                "?accessToken=" + accessToken;
 
-        String redirectUrl="https://ssu-phraiz-fe.vercel.app/login/oauth?tempToken=" + tempToken;
+        String redirectUrl="https://www.phraiz.com/login/oauth?tempToken=" + tempToken;
         response.sendRedirect(redirectUrl);
 
         // 쿠키, 타임리프, 엔드포인트를 하나 만들기
