@@ -70,12 +70,15 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                 throw new BusinessLogicException(MemberErrorCode.DUPLICATE_EMAIL);
             }
 
+            String id = oAuth2Response.getEmail().substring(0, oAuth2Response.getEmail().indexOf("@"));
+
             member= Member.builder()
                     .loginType(loginType)
-                    .id(oAuth2Response.getProviderId())
+                    //.id(oAuth2Response.getProviderId())
                     .email(oAuth2Response.getEmail())
                     .planId(1L)
                     .role(null)
+                    .id(id)
                     .build();
             memberRepository.save(member);
         }else { // 이미 있는 유저
