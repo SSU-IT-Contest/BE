@@ -25,7 +25,7 @@ public class CustomOAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHa
 
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
         CustomOAuth2User customOAuth2User= (CustomOAuth2User) authentication.getPrincipal();
-        String id=customOAuth2User.getUsername();
+        String id = customOAuth2User.getEmail().substring(0, customOAuth2User.getEmail().indexOf("@"));
 
         System.out.println("로그인 유저: " + customOAuth2User);  // 로그 확인
         System.out.println("유저 ID: " + id); // 네이버/카카오 모두 찍히는지
