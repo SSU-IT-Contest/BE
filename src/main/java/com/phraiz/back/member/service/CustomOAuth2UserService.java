@@ -58,7 +58,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         LoginType loginType = LoginType.from(registrationId);
 
         // db에 존재하는지 확인
-        String username = oAuth2Response.getProviderId();
+        String username = oAuth2Response.getEmail().substring(0, oAuth2Response.getEmail().indexOf("@"));
         Member existMember=memberRepository.findById(username).orElse(null);
         String role=null;
 
