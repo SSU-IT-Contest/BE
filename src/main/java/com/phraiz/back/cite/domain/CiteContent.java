@@ -32,11 +32,20 @@ public class CiteContent {
     @Column(name = "created_at", updatable = false, nullable = false)
     private LocalDateTime createdAt;
 
+
+    @Column(name = "style", columnDefinition = "LONGTEXT", nullable = false)
+    private String style;
+
+    @Column(name = "url", columnDefinition = "LONGTEXT", nullable = false)
+    private String url;  // 변환된 인용문 텍스트
+
     @Builder
-    public CiteContent(CiteHistory history, String citationText, Integer sequenceNumber) {
+    public CiteContent(CiteHistory history, String citationText, Integer sequenceNumber, String style, String url) {
         this.history = history;
         this.citationText = citationText;
         this.sequenceNumber = sequenceNumber;
+        this.style = style;
+        this.url = url;
     }
 
     @PrePersist
