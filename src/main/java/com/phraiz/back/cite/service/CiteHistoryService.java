@@ -108,7 +108,7 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
     /**
      * 기존 히스토리에 새로운 content를 추가하는 메서드
      */
-    public Integer addContentToHistory(Long historyId, String memberId, String citationText) {
+    public Integer addContentToHistory(Long historyId, String memberId, String citationText, String style, String url) {
         CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
                 .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
         
@@ -122,6 +122,8 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
                 .history(history)
                 .citationText(citationText)
                 .sequenceNumber(nextSeqNum)
+                .style(style)
+                .url(url)
                 .build();
         
         history.addContent(newContent);
@@ -203,8 +205,10 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
                 .citationText(content.getCitationText())
                 .sequenceNumber(content.getSequenceNumber())
                 .lastUpdate(history.getLastUpdate())
-                .url(history.getCite().getUrl())
-                .style(history.getCite().getStyle())
+//                .url(history.getCite().getUrl())
+//                .style(history.getCite().getStyle())
+                .url(content.getUrl())
+                .style(content.getStyle())
                 .build();
     }
 }
