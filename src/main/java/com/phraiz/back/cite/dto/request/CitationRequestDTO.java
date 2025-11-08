@@ -8,6 +8,7 @@ public class CitationRequestDTO {
     private String citation;
     // private String title;
     private String style;
+    private String url;
 
     Long folderId;
     Long historyId;
