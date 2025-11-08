@@ -67,7 +67,7 @@ public class CiteService {
             resultHistoryName = historyInfo.name();
         } else {
             // 새로운 히스토리 생성 및 content 추가
-            var newHistory = citeHistoryService.createCitationHistory(memberId, folderId, citationText, cite.getCiteId());
+            var newHistory = citeHistoryService.createCitationHistory(memberId, folderId, citationText, cite.getCiteId(), cite.getStyle(), cite.getUrl());
             resultHistoryId = newHistory.getId();
             resultFolderId = newHistory.getFolderId();
             resultHistoryName = newHistory.getName();
