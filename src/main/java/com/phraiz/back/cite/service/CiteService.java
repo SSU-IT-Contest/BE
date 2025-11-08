@@ -59,7 +59,7 @@ public class CiteService {
         // 히스토리 처리
         if (historyId != null) {
             // 기존 히스토리에 content 추가 + style, url 도
-            citeHistoryService.addContentToHistory(historyId, memberId, citationText, cite.getStyle(), cite.getUrl());
+            citeHistoryService.addContentToHistory(historyId, memberId, citationText, citationRequestDTO.getStyle(), citationRequestDTO.getUrl());
             resultHistoryId = historyId;
             // 기존 히스토리의 folderId와 name 조회
             var historyInfo = citeHistoryService.getHistoryInfo(historyId, memberId);
@@ -67,7 +67,7 @@ public class CiteService {
             resultHistoryName = historyInfo.name();
         } else {
             // 새로운 히스토리 생성 및 content 추가
-            var newHistory = citeHistoryService.createCitationHistory(memberId, folderId, citationText, cite.getCiteId());
+            var newHistory = citeHistoryService.createCitationHistory(memberId, folderId, citationText, cite.getCiteId(), citationRequestDTO.getStyle(), citationRequestDTO.getUrl());
             resultHistoryId = newHistory.getId();
             resultFolderId = newHistory.getFolderId();
             resultHistoryName = newHistory.getName();

@@ -139,7 +139,7 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
      * 새로운 인용문 히스토리를 생성하고 첨 번째 content를 추가하는 메서드 (외부 호출용)
      * createNewHistory와 addContentToHistory를 결합하여 사용
      */
-    public CiteHistory createCitationHistory(String memberId, Long folderId, String citationText, Long citeId) {
+    public CiteHistory createCitationHistory(String memberId, Long folderId, String citationText, Long citeId, String style, String url) {
         // 1. Cite 조회
         Cite cite = citeRepository.findById(citeId)
                 .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.CITE_NOT_FOUND));
@@ -151,6 +151,8 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
         CiteContent firstContent = CiteContent.builder()
                 .history(newHistory)
                 .citationText(citationText)
+                .style(style)
+                .url(url)
                 .sequenceNumber(1)
                 .build();
         
