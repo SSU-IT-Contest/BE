@@ -58,8 +58,8 @@ public class CiteService {
 
         // 히스토리 처리
         if (historyId != null) {
-            // 기존 히스토리에 content 추가
-            citeHistoryService.addContentToHistory(historyId, memberId, citationText);
+            // 기존 히스토리에 content 추가 + style, url 도
+            citeHistoryService.addContentToHistory(historyId, memberId, citationText, cite.getStyle(), cite.getUrl());
             resultHistoryId = historyId;
             // 기존 히스토리의 folderId와 name 조회
             var historyInfo = citeHistoryService.getHistoryInfo(historyId, memberId);
