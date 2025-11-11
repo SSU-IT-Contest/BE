@@ -126,6 +126,9 @@ public class SummaryHistoryService extends AbstractHistoryService<SummaryHistory
                 .originalText(content.getOriginalText())
                 .summarizedText(content.getSummarizedText())
                 .sequenceNumber(content.getSequenceNumber())
+                .mode(content.getMode())
+                .target(content.getTarget())
+                .question(content.getQuestion())
                 .remainingToken(0L)  // 조회 시에는 토큰 정보 불필요
                 .build();
     }

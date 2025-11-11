@@ -126,6 +126,9 @@ public class ParaphraseHistoryService extends AbstractHistoryService<ParaphraseH
                 .originalText(content.getOriginalText())
                 .paraphrasedText(content.getParaphrasedText())
                 .sequenceNumber(content.getSequenceNumber())
+                .mode((content.getMode()))
+                .scale((content.getScale()))
+                .userRequestMode((content.getUserRequestMode()))
                 .remainingToken(0L)  // 조회 시에는 토큰 정보 불필요
                 .build();
     }
