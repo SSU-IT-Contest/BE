@@ -21,6 +21,7 @@ import com.phraiz.back.paraphrase.repository.ParaphraseHistoryRepository;
 import com.phraiz.back.summary.exception.SummaryErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.Nullable;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,23 +44,23 @@ public class ParaphraseService {
 
     public ParaphraseResponseDTO paraphraseStandard(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
         return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.STANDARD.getPrompt(), paraphraseRequestDTO.getScale(),
-                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
+                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId(), "standard");
     }
     public ParaphraseResponseDTO paraphraseAcademic(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
         return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.ACADEMIC.getPrompt(), paraphraseRequestDTO.getScale(),
-                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
+                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId(), "academic");
     }
     public ParaphraseResponseDTO paraphraseCreative(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
         return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.CREATIVE.getPrompt(), paraphraseRequestDTO.getScale(),
-                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
+                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId(), "creative");
     }
     public ParaphraseResponseDTO paraphraseFluency(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
         return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.FLUENCY.getPrompt(), paraphraseRequestDTO.getScale(),
-                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
+                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId(), "fluency");
     }
     public ParaphraseResponseDTO paraphraseExperimental(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
         return paraphrase(memberId, paraphraseRequestDTO.getText(), ParaphrasePrompt.EXPERIMENTAL.getPrompt(), paraphraseRequestDTO.getScale(),
-                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
+                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId(), "experimental");
     }
     public ParaphraseResponseDTO paraphraseCustom(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
         // free 요금제 사용자는 사용 불가능
@@ -75,16 +76,17 @@ public class ParaphraseService {
             throw new BusinessLogicException(ParaphraseErrorCode.INVALID_INPUT);
         }
         return paraphrase(memberId, paraphraseRequestDTO.getText(), paraphraseMode, paraphraseRequestDTO.getScale(),
-                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId());
+                paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId(), "custom");
     }
 
-
-        // 1. paraphrase 메서드
+    // 1. paraphrase 메서드
     private ParaphraseResponseDTO paraphrase(String memberId,
                                              String paraphraseRequestedText,
                                              String paraphraseMode, int scale,
                                              Long folderId,
-                                             Long historyId){
+                                             Long historyId,
+                                             String mode
+                                             ){
         long remainingToken = 0;
 
         // 1. 로그인한 멤버 정보 가져오기 - 멤버의 요금제 정보
@@ -107,7 +109,10 @@ public class ParaphraseService {
                 folderId,
                 historyId,
                 paraphraseRequestedText,  // 원본 텍스트
-                result                     // 패러프레이징 결과
+                result,                     // 패러프레이징 결과
+                scale,
+                mode,
+                paraphraseMode
         );
 
         // 5. 사용량 업데이트
@@ -128,7 +133,7 @@ public class ParaphraseService {
     
     // 4. Content 저장 로직
     private HistoryMetaDTO saveParaphraseContent(String memberId, Long folderId, Long historyId, 
-                                                  String originalText, String paraphrasedText) {
+                                                  String originalText, String paraphrasedText, int scale, String mode, String paraphraseMode) {
         ParaphraseHistory history;
         Integer nextSequenceNumber;
         
@@ -153,14 +158,30 @@ public class ParaphraseService {
             history = paraphraseHistoryService.createNewHistory(memberId, folderId);
             nextSequenceNumber = 1;
         }
+
+        ParaphraseContent content;
         
         // Content 생성 및 저장
-        ParaphraseContent content = ParaphraseContent.builder()
-                .history(history)
-                .originalText(originalText)
-                .paraphrasedText(paraphrasedText)
-                .sequenceNumber(nextSequenceNumber)
-                .build();
+        if(mode.equals("custom")){
+            content = ParaphraseContent.builder()
+                    .history(history)
+                    .originalText(originalText)
+                    .paraphrasedText(paraphrasedText)
+                    .sequenceNumber(nextSequenceNumber)
+                    .scale(scale)
+                    .mode(mode)
+                    .userRequestMode(paraphraseMode)    // 사용자 지정모드는 따로 모드 세부 내용 저장
+                    .build();
+        } else {
+            content = ParaphraseContent.builder()
+                    .history(history)
+                    .originalText(originalText)
+                    .paraphrasedText(paraphrasedText)
+                    .sequenceNumber(nextSequenceNumber)
+                    .scale(scale)
+                    .mode(mode)
+                    .build();
+        }        
         
         paraphraseContentRepository.save(content);
         

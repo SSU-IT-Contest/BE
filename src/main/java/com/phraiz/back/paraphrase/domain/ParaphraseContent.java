@@ -33,16 +33,28 @@ public class ParaphraseContent {
     @Column(name = "sequence_number", nullable = false)
     private Integer sequenceNumber;
 
+    @Column(name = "paraphrase_mode", nullable = false)
+    private String mode;
+
+    @Column(name = "scale", nullable = false)
+    private Integer scale;
+
+    @Column(name = "user_request_mode", nullable = true)
+    private String userRequestMode;
+
     @Column(name = "created_at", updatable = false, nullable = false)
     private LocalDateTime createdAt;
 
     @Builder
     public ParaphraseContent(ParaphraseHistory history, String originalText, 
-                            String paraphrasedText, Integer sequenceNumber) {
+                            String paraphrasedText, Integer sequenceNumber, String mode, Integer scale, String userRequestMode) {
         this.history = history;
         this.originalText = originalText;
         this.paraphrasedText = paraphrasedText;
         this.sequenceNumber = sequenceNumber;
+        this.mode = mode;
+        this.scale = scale;
+        this.userRequestMode = userRequestMode;
     }
 
     @PrePersist

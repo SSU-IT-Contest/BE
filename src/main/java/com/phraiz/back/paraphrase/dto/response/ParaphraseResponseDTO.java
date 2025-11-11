@@ -11,5 +11,9 @@ public class ParaphraseResponseDTO {
     String originalText;      // 원본 텍스트 추가
     String paraphrasedText;   // result → paraphrasedText로 변경
     Integer sequenceNumber;   // 몇 번째 content인지
+    String mode;
+    int scale; // 슬라이더 값
+    String userRequestMode;
+
     long remainingToken;
 }

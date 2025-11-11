@@ -45,22 +45,22 @@ public class SummaryService {
 
     public SummaryResponseDTO oneLineSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
         return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.ONE_LINE.getPrompt(),
-                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId());
+                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId(), "one-line", null);
     }
 
     public SummaryResponseDTO fullSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
         return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.FULL.getPrompt(),
-                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId());
+                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId(), "full", null);
     }
 
     public SummaryResponseDTO paragraphSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
         return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.PARAGRAPH.getPrompt(),
-                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId());
+                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId(), "by-paragraph", null);
     }
 
     public SummaryResponseDTO keyPointSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
         return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.KEY_POINT.getPrompt(),
-                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId());
+                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId(), "key-points", null);
     }
 
     public SummaryResponseDTO questionBasedSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
@@ -79,7 +79,7 @@ public class SummaryService {
         // 프롬프트에 삽입
         String prompt = String.format(SummaryPrompt.QUESTION_BASED.getPrompt(), question);
         return summary(memberId, summaryRequestDTO.getText(), prompt,
-                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId());
+                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId(), "question-based", question);
     }
 
     public SummaryResponseDTO targetedSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
@@ -97,7 +97,7 @@ public class SummaryService {
         // 프롬프트에 삽입
         String prompt = String.format(SummaryPrompt.TARGETED.getPrompt(), target);
         return summary(memberId, summaryRequestDTO.getText(), prompt,
-                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId());
+                summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId(), "targeted", target);
     }
 
     // 1. 요약 메서드
@@ -105,7 +105,8 @@ public class SummaryService {
                                        String summarizeRequestedText,
                                        String summarizeMode,
                                        Long folderId,
-                                       Long historyId){
+                                       Long historyId,
+                                       String mode, String custom){
 
         long remainingToken = 0;
 
@@ -128,7 +129,9 @@ public class SummaryService {
                 folderId,
                 historyId,
                 summarizeRequestedText,  // 원본 텍스트
-                result                    // 요약 결과
+                result,                    // 요약 결과
+                mode,
+                custom
         );
 
         // 5. 사용량 업데이트
@@ -149,7 +152,7 @@ public class SummaryService {
     
     // 4. Content 저장 로직
     private HistoryMetaDTO saveSummaryContent(String memberId, Long folderId, Long historyId, 
-                                               String originalText, String summarizedText) {
+                                               String originalText, String summarizedText, String mode, String custom) {
         SummaryHistory history;
         Integer nextSequenceNumber;
         
@@ -174,14 +177,38 @@ public class SummaryService {
             history = summaryHistoryService.createNewHistory(memberId, folderId);
             nextSequenceNumber = 1;
         }
-        
+
+        SummaryContent content;
+
         // Content 생성 및 저장
-        SummaryContent content = SummaryContent.builder()
-                .history(history)
-                .originalText(originalText)
-                .summarizedText(summarizedText)
-                .sequenceNumber(nextSequenceNumber)
-                .build();
+        if(mode.equals("question-based")){
+            content = SummaryContent.builder()
+                    .history(history)
+                    .originalText(originalText)
+                    .summarizedText(summarizedText)
+                    .sequenceNumber(nextSequenceNumber)
+                    .mode(mode)
+                    .question(custom)
+                    .build();
+        } else if(mode.equals("targeted")) {
+            content = SummaryContent.builder()
+                    .history(history)
+                    .originalText(originalText)
+                    .summarizedText(summarizedText)
+                    .sequenceNumber(nextSequenceNumber)
+                    .mode(mode)
+                    .target(custom)
+                    .build();
+        } else{
+            content = SummaryContent.builder()
+                    .history(history)
+                    .originalText(originalText)
+                    .summarizedText(summarizedText)
+                    .sequenceNumber(nextSequenceNumber)
+                    .mode(mode)
+                    .build();
+        }
+
         
         summaryContentRepository.save(content);
         
@@ -289,7 +316,7 @@ public class SummaryService {
             return questionBasedSummary(memberId, requestDTO);
         }else {
             return summary(memberId, text, prompt.getPrompt(),
-                    folderId, historyId);
+                    folderId, historyId, mode, null);
         }
     }
 

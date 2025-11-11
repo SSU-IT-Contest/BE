@@ -8,9 +8,9 @@ COPY build/libs/*SNAPSHOT.jar app.jar
 EXPOSE 8080
 
 # 실행
-ENTRYPOINT ["java", "-jar"]
-CMD ["app.jar"]
+#ENTRYPOINT ["java", "-jar"]
+#CMD ["app.jar"]
 
 # [Claude 제안] OOM 방지를 위한 JVM 메모리 제한 옵션
-# ENTRYPOINT ["java", "-Xms256m", "-Xmx512m", "-XX:MetaspaceSize=128m", "-XX:MaxMetaspaceSize=256m", "-jar"]
-# CMD ["app.jar"]
+ENTRYPOINT ["java", "-Xms256m", "-Xmx512m", "-XX:MetaspaceSize=128m", "-XX:MaxMetaspaceSize=256m", "-jar"]
+CMD ["app.jar"]
