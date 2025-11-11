@@ -33,16 +33,29 @@ public class SummaryContent {
     @Column(name = "sequence_number", nullable = false)
     private Integer sequenceNumber;
 
+    @Column(name = "mode", nullable = false)
+    private String mode;
+
+    @Column(name = "target", nullable = true)
+    private String target;
+
+    @Column(name = "question", nullable = true)
+    private String question;
+
     @Column(name = "created_at", updatable = false, nullable = false)
     private LocalDateTime createdAt;
 
     @Builder
     public SummaryContent(SummaryHistory history, String originalText, 
-                         String summarizedText, Integer sequenceNumber) {
+                         String summarizedText, Integer sequenceNumber, String mode,
+                          String target, String question) {
         this.history = history;
         this.originalText = originalText;
         this.summarizedText = summarizedText;
         this.sequenceNumber = sequenceNumber;
+        this.mode = mode;
+        this.target = target;
+        this.question = question;
     }
 
     @PrePersist
