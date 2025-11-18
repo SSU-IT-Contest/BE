@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Collections;
 
 @Service
-@Transactional
 @Slf4j
 public class CiteFolderService extends AbstractFolderService<CiteFolder> {
     private final MemberRepository memberRepository;
@@ -36,8 +35,7 @@ public class CiteFolderService extends AbstractFolderService<CiteFolder> {
                 .build();
 
         return FoldersResponseDTO.builder()
-                .folders(Collections.singletonList(folderItem))   // Java 8 호환
-                // .folders(List.of(folderItem))                  // Java 9+ 에서는 이렇게도 가능
+                .folders(Collections.singletonList(folderItem))
                 .build();
     }
 
@@ -50,12 +48,20 @@ public class CiteFolderService extends AbstractFolderService<CiteFolder> {
     }
 
     @Override
+    @Transactional(readOnly = true)
     protected void validateCreateFolder(String memberId) {
-        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Member member = getMember(memberId);
         Plan userPlan = Plan.fromId(member.getPlanId());
-        if(userPlan == Plan.FREE){
+        if (userPlan == Plan.FREE) {
             throw new BusinessLogicException(CiteErrorCode.PLAN_NOT_ACCESSED);
         }
+    }
+
+    // ⭐ 읽기 전용 트랜잭션 - 멤버 조회
+    @Transactional(readOnly = true)
+    private Member getMember(String memberId) {
+        return memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
     }
 
 }
