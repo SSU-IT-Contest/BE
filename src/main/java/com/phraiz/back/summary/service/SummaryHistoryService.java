@@ -26,8 +26,8 @@ import java.util.Collections;
 
 
 @Service
-@Transactional
 @Slf4j
+// ⭐ 클래스 레벨 @Transactional 제거 - 필요한 메서드에만 선택적 적용
 public class SummaryHistoryService extends AbstractHistoryService<SummaryHistory> {
 
     private final MemberRepository memberRepository;
@@ -68,8 +68,9 @@ public class SummaryHistoryService extends AbstractHistoryService<SummaryHistory
     }
 
     @Override
+    @Transactional(readOnly = true)
     protected void validateRemainingHistoryCount(String memberId) {
-        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Member member = getMember(memberId);
         Plan userPlan = Plan.fromId(member.getPlanId());
         if(userPlan == Plan.FREE){
             long currentCount = repo.countByMemberId(memberId);
@@ -80,7 +81,8 @@ public class SummaryHistoryService extends AbstractHistoryService<SummaryHistory
         }
     }
 
-    // 새로운 히스토리 생성 메서드 (SummaryService에서 사용)
+    // ⭐ 쓰기 트랜잭션 - 새로운 히스토리 생성 메서드 (SummaryService에서 사용)
+    @Transactional
     public SummaryHistory createNewHistory(String memberId, Long folderId) {
         // 1. 히스토리 개수 검증
         validateRemainingHistoryCount(memberId);
@@ -101,7 +103,8 @@ public class SummaryHistoryService extends AbstractHistoryService<SummaryHistory
         return newHistory;
     }
 
-    // 히스토리 content 조회 (sequenceNumber 지정 가능, null이면 최신 조회)
+    // ⭐ 읽기 전용 트랜잭션 - 히스토리 content 조회 (sequenceNumber 지정 가능, null이면 최신 조회)
+    @Transactional(readOnly = true)
     public SummaryResponseDTO readHistoryContent(String memberId, Long historyId, Integer sequenceNumber) {
         // 1. 히스토리 존재 및 권한 확인
         SummaryHistory history = repo.findByIdAndMemberId(historyId, memberId)
@@ -135,6 +138,7 @@ public class SummaryHistoryService extends AbstractHistoryService<SummaryHistory
 
     // 기존 saveOrUpdateHistory는 호환성을 위해 남겨둠 (필요시 삭제 가능)
     @Deprecated
+    @Transactional
     public HistoryMetaDTO saveOrUpdateHistory(String memberId,
                                               Long folderId,
                                               Long historyId,
@@ -147,6 +151,13 @@ public class SummaryHistoryService extends AbstractHistoryService<SummaryHistory
 
         SummaryHistory newHistory = createNewHistory(memberId, folderId);
         return new HistoryMetaDTO(newHistory.getId(), newHistory.getName(), null);
+    }
+
+    // ⭐ 읽기 전용 트랜잭션 - 멤버 조회
+    @Transactional(readOnly = true)
+    private Member getMember(String memberId) {
+        return memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
     }
 
     private String buildDatedTitle(String label, long id) {

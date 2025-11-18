@@ -24,7 +24,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 
 @Service
-@Transactional
 @Slf4j
 public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
 
@@ -67,11 +66,11 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
     }
 
     @Override
+    @Transactional(readOnly = true)
     protected void validateRemainingHistoryCount(String memberId) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Member member = getMember(memberId);
         Plan userPlan = Plan.fromId(member.getPlanId());
-        if(userPlan == Plan.FREE){
+        if (userPlan == Plan.FREE) {
             long currentCount = repo.countByMemberId(memberId);
             if (currentCount >= MAX_HISTORY_FOR_FREE) {
                 throw new BusinessLogicException(CiteErrorCode.PLAN_LIMIT_EXCEEDED);
@@ -83,6 +82,7 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
      * 새로운 히스토리를 생성하는 메서드 (CiteService에서 사용)
      * ParaphraseHistoryService 구조 참고 - 히스토리 생성만 담당
      */
+    @Transactional
     public CiteHistory createNewHistory(String memberId, Long folderId, Cite cite) {
         // 1. 히스토리 개수 검증
         validateRemainingHistoryCount(memberId);
@@ -108,9 +108,9 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
     /**
      * 기존 히스토리에 새로운 content를 추가하는 메서드
      */
+    @Transactional
     public Integer addContentToHistory(Long historyId, String memberId, String citationText, String style, String url) {
-        CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
-                .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
+        CiteHistory history = getHistory(historyId, memberId);
         
         // 새로운 sequenceNumber 계산 (가장 최근 content의 sequenceNumber + 1)
         Integer nextSeqNum = citeContentRepository.findMaxSequenceNumberByHistoryId(historyId)
@@ -136,9 +136,10 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
     }
 
     /**
-     * 새로운 인용문 히스토리를 생성하고 첨 번째 content를 추가하는 메서드 (외부 호출용)
+     * 새로운 인용문 히스토리를 생성하고 첫 번째 content를 추가하는 메서드 (외부 호출용)
      * createNewHistory와 addContentToHistory를 결합하여 사용
      */
+    @Transactional
     public CiteHistory createCitationHistory(String memberId, Long folderId, String citationText, Long citeId, String style, String url) {
         // 1. Cite 조회
         Cite cite = citeRepository.findById(citeId)
@@ -147,7 +148,7 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
         // 2. 히스토리 생성
         CiteHistory newHistory = createNewHistory(memberId, folderId, cite);
         
-        // 3. 첨 번째 content 추가
+        // 3. 첫 번째 content 추가
         CiteContent firstContent = CiteContent.builder()
                 .history(newHistory)
                 .citationText(citationText)
@@ -165,32 +166,18 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
     /**
      * 히스토리 ID로 folderId와 name을 조회하는 메서드
      */
+    @Transactional(readOnly = true)
     public HistoryInfo getHistoryInfo(Long historyId, String memberId) {
-        CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
-                .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
+        CiteHistory history = getHistory(historyId, memberId);
         return new HistoryInfo(history.getFolderId(), history.getName());
-    }
-
-    // 히스토리 정보를 담는 record
-    public record HistoryInfo(Long folderId, String name) {}
-
-    /**
-     * 히스토리 ID로 folderId를 조회하는 메서드 (호환성 유지)
-     * @deprecated getHistoryInfo 사용 권장
-     */
-    @Deprecated
-    public Long getFolderIdByHistoryId(Long historyId, String memberId) {
-        CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
-                .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
-        return history.getFolderId();
     }
 
     /**
      * 특정 sequenceNumber의 content를 조회하는 메서드
      */
+    @Transactional(readOnly = true)
     public CitationHistoryContentResponseDTO readCitationHistoryContent(String memberId, Long historyId, Integer sequenceNumber) {
-        CiteHistory history = repo.findByIdAndMemberId(historyId, memberId)
-                .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
+        CiteHistory history = getHistory(historyId, memberId);
 
         // sequenceNumber가 제공되면 해당 content를 조회, 아니면 가장 최근 content 조회
         CiteContent content;
@@ -207,10 +194,37 @@ public class CiteHistoryService extends AbstractHistoryService<CiteHistory> {
                 .citationText(content.getCitationText())
                 .sequenceNumber(content.getSequenceNumber())
                 .lastUpdate(history.getLastUpdate())
-//                .url(history.getCite().getUrl())
-//                .style(history.getCite().getStyle())
                 .url(content.getUrl())
                 .style(content.getStyle())
                 .build();
     }
+
+    /**
+     * 히스토리 ID로 folderId를 조회하는 메서드 (호환성 유지)
+     * @deprecated getHistoryInfo 사용 권장
+     */
+    @Deprecated
+    @Transactional(readOnly = true)
+    public Long getFolderIdByHistoryId(Long historyId, String memberId) {
+        CiteHistory history = getHistory(historyId, memberId);
+        return history.getFolderId();
+    }
+
+    // ⭐ 읽기 전용 트랜잭션 - 멤버 조회
+    @Transactional(readOnly = true)
+    private Member getMember(String memberId) {
+        return memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+    }
+
+    // ⭐ 읽기 전용 트랜잭션 - 히스토리 조회
+    @Transactional(readOnly = true)
+    private CiteHistory getHistory(Long historyId, String memberId) {
+        return repo.findByIdAndMemberId(historyId, memberId)
+                .orElseThrow(() -> new BusinessLogicException(CiteErrorCode.HISTORY_NOT_FOUND));
+    }
+
+    // 히스토리 정보를 담는 record
+    public record HistoryInfo(Long folderId, String name) {}
+
 }
