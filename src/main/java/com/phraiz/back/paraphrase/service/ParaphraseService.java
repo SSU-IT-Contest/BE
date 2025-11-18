@@ -31,7 +31,7 @@ import java.time.YearMonth;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
+// 클래스 레벨 @Transactional 제거 - GPT API 호출로 인한 DB 커넥션 starvation 방지
 public class ParaphraseService {
 
     private final OpenAIService openAIService;
@@ -64,7 +64,7 @@ public class ParaphraseService {
     }
     public ParaphraseResponseDTO paraphraseCustom(String memberId, ParaphraseRequestDTO paraphraseRequestDTO){
         // free 요금제 사용자는 사용 불가능
-        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Member member = getMember(memberId);
         Plan userPlan = Plan.fromId(member.getPlanId());
         if(userPlan == Plan.FREE){
             throw new BusinessLogicException(SummaryErrorCode.PLAN_NOT_ACCESSED);
@@ -79,7 +79,7 @@ public class ParaphraseService {
                 paraphraseRequestDTO.getFolderId(), paraphraseRequestDTO.getHistoryId(), "custom");
     }
 
-    // 1. paraphrase 메서드
+    // 1. paraphrase 메서드 (트랜잭션 없음 - GPT API 호출로 인한 커넥션 점유 방지)
     private ParaphraseResponseDTO paraphrase(String memberId,
                                              String paraphraseRequestedText,
                                              String paraphraseMode, int scale,
@@ -89,8 +89,8 @@ public class ParaphraseService {
                                              ){
         long remainingToken = 0;
 
-        // 1. 로그인한 멤버 정보 가져오기 - 멤버의 요금제 정보
-        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        // 1. 로그인한 멤버 정보 가져오기 - 멤버의 요금제 정보 (읽기 전용 트랜잭션)
+        Member member = getMember(memberId);
 
         // 2. 요금제 정책에 따라 다음 로직 분기
         // 2-1. 남은 월 토큰 확인 (DB나 Redis에서 누적 사용량 조회)
@@ -100,11 +100,11 @@ public class ParaphraseService {
             remainingToken = validateRemainingMonthlyTokens(memberId, userPlan, paraphraseRequestedText);
         }
 
-        // 3. paraphrase 처리 (service 호출)
+        // 3. GPT API 호출 (트랜잭션 밖에서 실행 - DB 커넥션 점유 안 함)
         String result = openAIService.callParaphraseOpenAI(paraphraseRequestedText, paraphraseMode, scale);
 
-        // 4. 내용 저장 (Content로 저장)
-        HistoryMetaDTO metaDTO = saveParaphraseContent(  // ★ 변경됨
+        // 4. DB 쓰기 작업만 트랜잭션으로 처리
+        HistoryMetaDTO metaDTO = saveParaphraseContentTransactional(
                 memberId,
                 folderId,
                 historyId,
@@ -115,9 +115,8 @@ public class ParaphraseService {
                 paraphraseMode
         );
 
-        // 5. 사용량 업데이트
-        //    - 월 토큰 사용량 증가
-        incrementMonthlyUsage(memberId, YearMonth.now().toString(), GptTokenUtil.estimateTokenCount(paraphraseRequestedText));
+        // 5. 사용량 업데이트 (트랜잭션 처리)
+        incrementMonthlyUsageTransactional(memberId, YearMonth.now().toString(), GptTokenUtil.estimateTokenCount(paraphraseRequestedText));
 
         // 6. result return
         ParaphraseResponseDTO responseDTO = ParaphraseResponseDTO.builder()
@@ -131,7 +130,22 @@ public class ParaphraseService {
         return responseDTO;
     }
     
-    // 4. Content 저장 로직
+    // 읽기 전용 트랜잭션 - 멤버 조회
+    @Transactional(readOnly = true)
+    private Member getMember(String memberId) {
+        return memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+    }
+    
+    // 쓰기 트랜잭션 - Content 저장
+    @Transactional
+    private HistoryMetaDTO saveParaphraseContentTransactional(String memberId, Long folderId, Long historyId,
+                                                               String originalText, String paraphrasedText, 
+                                                               int scale, String mode, String paraphraseMode) {
+        return saveParaphraseContent(memberId, folderId, historyId, originalText, paraphrasedText, scale, mode, paraphraseMode);
+    }
+    
+    // 4. Content 저장 로직 (내부 로직)
     private HistoryMetaDTO saveParaphraseContent(String memberId, Long folderId, Long historyId, 
                                                   String originalText, String paraphrasedText, int scale, String mode, String paraphraseMode) {
         ParaphraseHistory history;
@@ -220,6 +234,12 @@ public class ParaphraseService {
         redisService.setMonthlyUsage(memberId, month, used);
         return used;
 
+    }
+
+    // 쓰기 트랜잭션 - 사용량 업데이트
+    @Transactional
+    private void incrementMonthlyUsageTransactional(String memberId, String month, long increment) {
+        incrementMonthlyUsage(memberId, month, increment);
     }
 
     private void incrementMonthlyUsage (String memberId, String month, long increment){

@@ -6,6 +6,14 @@ spring:
     url: ${DEV_DB_URL:jdbc:mysql://localhost:3306/phraiz}
     username: ${DEV_DB_USERNAME}
     password: ${DEV_DB_PASSWORD}
+    # HikariCP 커넥션 풀 최적화 (GPT API 호출로 인한 starvation 방지)
+    hikari:
+      maximum-pool-size: 30           # 10 → 30으로 증가 (동시 요청 처리 능력 향상)
+      minimum-idle: 5                 # 최소 유휴 커넥션
+      connection-timeout: 30000       # 30초 - 커넥션 획듥 타임아웃
+      idle-timeout: 600000            # 10분 - 유휴 커넥션 유지 시간
+      max-lifetime: 1800000           # 30분 - 커넥션 최대 생명 주기
+      leak-detection-threshold: 60000 # 60초 - 커넥션 누수 감지 (로그 출력)
 
   redis:
     host: ${REDIS_HOST:localhost}

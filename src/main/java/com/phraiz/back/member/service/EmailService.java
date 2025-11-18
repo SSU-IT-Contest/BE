@@ -18,7 +18,6 @@ import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 @Slf4j
 // 인증코드 생성하고 이메일 보내는 서비스
 public class EmailService {
@@ -100,6 +99,7 @@ public class EmailService {
 
     }
     // 이메일로 사용자 찾기 존재->true
+    @Transactional(readOnly = true)
     public boolean getMemberByEmail(String email) {
         // 등록된 이메일인지 확인
         return memberRepository.existsByEmail(email);
