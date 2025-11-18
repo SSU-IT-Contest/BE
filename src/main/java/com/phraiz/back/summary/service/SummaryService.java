@@ -32,7 +32,7 @@ import java.time.YearMonth;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
+// ⭐ 클래스 레벨 @Transactional 제거 - GPT API 호출로 인한 DB 커넥션 starvation 방지
 public class SummaryService {
 
     private final OpenAIService openAIService;
@@ -65,7 +65,7 @@ public class SummaryService {
 
     public SummaryResponseDTO questionBasedSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
         // free 요금제 사용자는 사용 불가능
-        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Member member = getMember(memberId);
         Plan userPlan = Plan.fromId(member.getPlanId());
         if(userPlan == Plan.FREE){
             throw new BusinessLogicException(SummaryErrorCode.PLAN_NOT_ACCESSED);
@@ -84,7 +84,7 @@ public class SummaryService {
 
     public SummaryResponseDTO targetedSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
         // free 요금제 사용자는 사용 불가능
-        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Member member = getMember(memberId);
         Plan userPlan = Plan.fromId(member.getPlanId());
         if(userPlan == Plan.FREE){
             throw new BusinessLogicException(SummaryErrorCode.PLAN_NOT_ACCESSED);
@@ -100,7 +100,7 @@ public class SummaryService {
                 summaryRequestDTO.getFolderId(), summaryRequestDTO.getHistoryId(), "targeted", target);
     }
 
-    // 1. 요약 메서드
+    // 1. 요약 메서드 (트랜잭션 없음 - GPT API 호출로 인한 커넥션 점유 방지)
     private SummaryResponseDTO summary(String memberId,
                                        String summarizeRequestedText,
                                        String summarizeMode,
@@ -110,8 +110,8 @@ public class SummaryService {
 
         long remainingToken = 0;
 
-        // 1. 로그인한 멤버 정보 가져오기 - 멤버의 요금제 정보
-        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        // 1. 로그인한 멤버 정보 가져오기 - 멤버의 요금제 정보 (읽기 전용 트랜잭션)
+        Member member = getMember(memberId);
 
         // 2. 요금제 정책에 따라 다음 로직 분기
         // 2-1. 남은 월 토큰 확인 (DB나 Redis에서 누적 사용량 조회)
@@ -120,11 +120,11 @@ public class SummaryService {
             remainingToken = validateRemainingMonthlyTokens(memberId, userPlan, summarizeRequestedText);
         }
 
-        // 3. 요약 처리 (service 호출)
+        // 3. ⭐ GPT API 호출 (트랜잭션 밖에서 실행 - DB 커넥션 점유 안 함)
         String result = openAIService.callSummaryOpenAI(summarizeRequestedText, summarizeMode);
 
-        // 4. 내용 저장 (Content로 저장)
-        HistoryMetaDTO metaDTO = saveSummaryContent(  // ★ 변경됨
+        // 4. ⭐ DB 쓰기 작업만 트랜잭션으로 처리
+        HistoryMetaDTO metaDTO = saveSummaryContentTransactional(
                 memberId,
                 folderId,
                 historyId,
@@ -134,9 +134,8 @@ public class SummaryService {
                 custom
         );
 
-        // 5. 사용량 업데이트
-        //    - 월 토큰 사용량 증가
-        incrementMonthlyUsage(memberId, YearMonth.now().toString(), GptTokenUtil.estimateTokenCount(summarizeRequestedText));
+        // 5. 사용량 업데이트 (트랜잭션 처리)
+        incrementMonthlyUsageTransactional(memberId, YearMonth.now().toString(), GptTokenUtil.estimateTokenCount(summarizeRequestedText));
 
         // 6. result return
         SummaryResponseDTO responseDTO = SummaryResponseDTO.builder()
@@ -150,7 +149,22 @@ public class SummaryService {
         return responseDTO;
     }
     
-    // 4. Content 저장 로직
+    // ⭐ 읽기 전용 트랜잭션 - 멤버 조회
+    @Transactional(readOnly = true)
+    private Member getMember(String memberId) {
+        return memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+    }
+    
+    // ⭐ 쓰기 트랜잭션 - Content 저장
+    @Transactional
+    private HistoryMetaDTO saveSummaryContentTransactional(String memberId, Long folderId, Long historyId,
+                                                            String originalText, String summarizedText, 
+                                                            String mode, String custom) {
+        return saveSummaryContent(memberId, folderId, historyId, originalText, summarizedText, mode, custom);
+    }
+    
+    // 4. Content 저장 로직 (내부 로직)
     private HistoryMetaDTO saveSummaryContent(String memberId, Long folderId, Long historyId, 
                                                String originalText, String summarizedText, String mode, String custom) {
         SummaryHistory history;
@@ -248,6 +262,12 @@ public class SummaryService {
         return used;
     }
 
+    // ⭐ 쓰기 트랜잭션 - 사용량 업데이트
+    @Transactional
+    private void incrementMonthlyUsageTransactional(String memberId, String month, long increment) {
+        incrementMonthlyUsage(memberId, month, increment);
+    }
+
     private void incrementMonthlyUsage (String memberId, String month, long increment){
         long after = tokenUsageService.incrementUsedTokens(memberId, month, increment);
         // 캐시 동기화(정합성 보장)
@@ -260,7 +280,7 @@ public class SummaryService {
     public SummaryResponseDTO uploadFile(String memberId, MultipartFile file, String mode, String target, String question, Long historyId, Long folderId) {
         String text = "";
         // free 요금제 사용자는 사용 불가능
-        Member member=memberRepository.findById(memberId).orElseThrow(()->new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
+        Member member = getMember(memberId);
         Plan userPlan = Plan.fromId(member.getPlanId());
         if(userPlan == Plan.FREE){
             throw new BusinessLogicException(SummaryErrorCode.PLAN_NOT_ACCESSED);
