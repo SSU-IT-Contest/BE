@@ -57,7 +57,7 @@ public class CiteFolderService extends AbstractFolderService<CiteFolder> {
         }
     }
 
-    // ⭐ 읽기 전용 트랜잭션 - 멤버 조회
+    // 읽기 전용 트랜잭션 - 멤버 조회
     @Transactional(readOnly = true)
     private Member getMember(String memberId) {
         return memberRepository.findById(memberId)

@@ -35,5 +35,5 @@ logging:
   level:
     root: WARN
     com.phraiz.back: ERROR
-    # ⭐ HikariCP 로그 레벨 - 커넥션 풀 모니터링
+    # HikariCP 로그 레벨 - 커넥션 풀 모니터링
     com.zaxxer.hikari: INFO  # 커넥션 풀 상태 확인 (필요시 DEBUG로 변경)
