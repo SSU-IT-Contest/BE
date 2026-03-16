@@ -8,7 +8,9 @@ import com.phraiz.back.member.domain.Member;
 import com.phraiz.back.member.dto.request.LoginRequestDTO;
 import com.phraiz.back.member.dto.request.SignUpRequestDTO;
 import com.phraiz.back.member.dto.response.LoginResponseDTO;
+import com.phraiz.back.member.dto.response.MemberRefDto;
 import com.phraiz.back.member.dto.response.SignUpResponseDTO;
+import com.phraiz.back.member.mapper.MemberMapper;
 import com.phraiz.back.member.enums.LoginType;
 import com.phraiz.back.member.exception.MemberErrorCode;
 import com.phraiz.back.member.repository.MemberRepository;
@@ -42,6 +44,8 @@ public class MemberService {
     private RedisTemplate<String, String> redisTemplate;
     @Autowired
     private EmailService emailService;
+    @Autowired
+    private MemberMapper memberMapper;
 
     // token 재발급-RTR 방식으로
     public LoginResponseDTO reissueToken(String refreshToken) {
@@ -276,16 +280,33 @@ public class MemberService {
 
 
     // 3. 회원정보 가져오기
-    public LoginResponseDTO getMember(String id, String accessToken) {
-        Member member=memberRepository.findById(id)
-                .orElseThrow(()->new UsernameNotFoundException("존재하지 않는 사용자입니다."));
 
-        return new LoginResponseDTO(accessToken,
-                member.getMemberId(),
-                member.getId(),
-                member.getEmail(),
-                member.getRole(),
-                member.getPlanId());
+    /**
+     * 로그인 응답용 회원 정보 조회
+     */
+    @Transactional(readOnly = true)
+    public LoginResponseDTO getMemberForLogin(String id, String accessToken) {
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException("존재하지 않는 사용자입니다."));
+        return memberMapper.toLoginResponseDto(member, accessToken);
+    }
+
+    /**
+     * 다른 도메인에서 사용할 최소 회원 정보 조회 (memberId, planId)
+     */
+    @Transactional(readOnly = true)
+    public MemberRefDto getMemberRef(String id) {
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new UsernameNotFoundException("존재하지 않는 사용자입니다."));
+        return memberMapper.toMemberRefDto(member);
+    }
+
+    /**
+     * @deprecated getMemberForLogin() 사용 권장
+     */
+    @Deprecated
+    public LoginResponseDTO getMember(String id, String accessToken) {
+        return getMemberForLogin(id, accessToken);
     }
 
 
