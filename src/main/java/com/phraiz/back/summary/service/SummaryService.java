@@ -7,23 +7,17 @@ import com.phraiz.back.common.service.OpenAIService;
 import com.phraiz.back.common.service.RedisService;
 import com.phraiz.back.common.enums.Plan;
 import com.phraiz.back.common.util.GptTokenUtil;
-import com.phraiz.back.member.domain.Member;
-import com.phraiz.back.member.exception.MemberErrorCode;
-import com.phraiz.back.member.repository.MemberRepository;
-import com.phraiz.back.summary.domain.SummaryContent;
-import com.phraiz.back.summary.domain.SummaryHistory;
+import com.phraiz.back.member.dto.response.MemberRefDto;
+import com.phraiz.back.member.service.MemberService;
 import com.phraiz.back.summary.dto.request.SummaryRequestDTO;
 import com.phraiz.back.summary.dto.response.SummaryResponseDTO;
 import com.phraiz.back.summary.enums.SummaryPrompt;
 import com.phraiz.back.summary.exception.SummaryErrorCode;
-import com.phraiz.back.summary.repository.SummaryContentRepository;
-import com.phraiz.back.summary.repository.SummaryHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -37,11 +31,9 @@ public class SummaryService {
 
     private final OpenAIService openAIService;
     private final RedisService redisService;
-    private final SummaryHistoryService summaryHistoryService;
-    private final SummaryContentRepository summaryContentRepository;
-    private final SummaryHistoryRepository summaryHistoryRepository;
     private final MonthlyTokenUsageService tokenUsageService;
-    private final MemberRepository memberRepository;
+    private final MemberService memberService;
+    private final SummaryContentService summaryContentService;
 
     public SummaryResponseDTO oneLineSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
         return summary(memberId, summaryRequestDTO.getText(), SummaryPrompt.ONE_LINE.getPrompt(),
@@ -65,8 +57,8 @@ public class SummaryService {
 
     public SummaryResponseDTO questionBasedSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
         // free 요금제 사용자는 사용 불가능
-        Member member = getMember(memberId);
-        Plan userPlan = Plan.fromId(member.getPlanId());
+        MemberRefDto memberRef = memberService.getMemberRef(memberId);
+        Plan userPlan = Plan.fromId(memberRef.getPlanId());
         if(userPlan == Plan.FREE){
             throw new BusinessLogicException(SummaryErrorCode.PLAN_NOT_ACCESSED);
         }
@@ -84,8 +76,8 @@ public class SummaryService {
 
     public SummaryResponseDTO targetedSummary(String memberId, SummaryRequestDTO summaryRequestDTO){
         // free 요금제 사용자는 사용 불가능
-        Member member = getMember(memberId);
-        Plan userPlan = Plan.fromId(member.getPlanId());
+        MemberRefDto memberRef = memberService.getMemberRef(memberId);
+        Plan userPlan = Plan.fromId(memberRef.getPlanId());
         if(userPlan == Plan.FREE){
             throw new BusinessLogicException(SummaryErrorCode.PLAN_NOT_ACCESSED);
         }
@@ -110,12 +102,12 @@ public class SummaryService {
 
         long remainingToken = 0;
 
-        // 1. 로그인한 멤버 정보 가져오기 - 멤버의 요금제 정보 (읽기 전용 트랜잭션)
-        Member member = getMember(memberId);
+        // 1. 로그인한 멤버 정보 가져오기 - 멤버의 요금제 정보
+        MemberRefDto memberRef = memberService.getMemberRef(memberId);
 
         // 2. 요금제 정책에 따라 다음 로직 분기
         // 2-1. 남은 월 토큰 확인 (DB나 Redis에서 누적 사용량 조회)
-        Plan userPlan = Plan.fromId(member.getPlanId());
+        Plan userPlan = Plan.fromId(memberRef.getPlanId());
         if(userPlan != Plan.PRO){
             remainingToken = validateRemainingMonthlyTokens(memberId, userPlan, summarizeRequestedText);
         }
@@ -123,8 +115,8 @@ public class SummaryService {
         // 3. ⭐ GPT API 호출 (트랜잭션 밖에서 실행 - DB 커넥션 점유 안 함)
         String result = openAIService.callSummaryOpenAI(summarizeRequestedText, summarizeMode);
 
-        // 4. ⭐ DB 쓰기 작업만 트랜잭션으로 처리
-        HistoryMetaDTO metaDTO = saveSummaryContentTransactional(
+        // 4. DB 쓰기 작업 (트랜잭션 처리)
+        HistoryMetaDTO metaDTO = summaryContentService.saveSummaryContent(
                 memberId,
                 folderId,
                 historyId,
@@ -134,8 +126,8 @@ public class SummaryService {
                 custom
         );
 
-        // 5. 사용량 업데이트 (트랜잭션 처리)
-        incrementMonthlyUsageTransactional(memberId, YearMonth.now().toString(), GptTokenUtil.estimateTokenCount(summarizeRequestedText));
+        // 5. 사용량 업데이트
+        incrementMonthlyUsage(memberId, YearMonth.now().toString(), GptTokenUtil.estimateTokenCount(summarizeRequestedText));
 
         // 6. result return
         SummaryResponseDTO responseDTO = SummaryResponseDTO.builder()
@@ -147,87 +139,6 @@ public class SummaryService {
                 .remainingToken(remainingToken)
                 .build();
         return responseDTO;
-    }
-    
-    // ⭐ 읽기 전용 트랜잭션 - 멤버 조회
-    @Transactional(readOnly = true)
-    private Member getMember(String memberId) {
-        return memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessLogicException(MemberErrorCode.USER_NOT_FOUND));
-    }
-    
-    // ⭐ 쓰기 트랜잭션 - Content 저장
-    @Transactional
-    private HistoryMetaDTO saveSummaryContentTransactional(String memberId, Long folderId, Long historyId,
-                                                            String originalText, String summarizedText, 
-                                                            String mode, String custom) {
-        return saveSummaryContent(memberId, folderId, historyId, originalText, summarizedText, mode, custom);
-    }
-    
-    // 4. Content 저장 로직 (내부 로직)
-    private HistoryMetaDTO saveSummaryContent(String memberId, Long folderId, Long historyId, 
-                                               String originalText, String summarizedText, String mode, String custom) {
-        SummaryHistory history;
-        Integer nextSequenceNumber;
-        
-        if (historyId != null) {
-            // 기존 히스토리에 content 추가
-            history = summaryHistoryRepository.findById(historyId)
-                    .orElseThrow(() -> new BusinessLogicException(SummaryErrorCode.HISTORY_NOT_FOUND));
-            
-            // 현재 content 개수 확인하여 다음 sequence number 계산
-            Long contentCount = summaryContentRepository.countByHistoryId(historyId);
-            nextSequenceNumber = contentCount.intValue() + 1;
-            
-            // 10개 초과 시 가장 오래된 content 삭제
-            if (contentCount >= 10) {
-                summaryContentRepository.findByHistoryIdOrderBySequenceNumberDesc(historyId)
-                        .stream()
-                        .skip(9)  // 최신 9개는 유지
-                        .forEach(summaryContentRepository::delete);
-            }
-        } else {
-            // 새 히스토리 생성
-            history = summaryHistoryService.createNewHistory(memberId, folderId);
-            nextSequenceNumber = 1;
-        }
-
-        SummaryContent content;
-
-        // Content 생성 및 저장
-        if(mode.equals("question-based")){
-            content = SummaryContent.builder()
-                    .history(history)
-                    .originalText(originalText)
-                    .summarizedText(summarizedText)
-                    .sequenceNumber(nextSequenceNumber)
-                    .mode(mode)
-                    .question(custom)
-                    .build();
-        } else if(mode.equals("targeted")) {
-            content = SummaryContent.builder()
-                    .history(history)
-                    .originalText(originalText)
-                    .summarizedText(summarizedText)
-                    .sequenceNumber(nextSequenceNumber)
-                    .mode(mode)
-                    .target(custom)
-                    .build();
-        } else{
-            content = SummaryContent.builder()
-                    .history(history)
-                    .originalText(originalText)
-                    .summarizedText(summarizedText)
-                    .sequenceNumber(nextSequenceNumber)
-                    .mode(mode)
-                    .build();
-        }
-
-        
-        summaryContentRepository.save(content);
-        
-        // HistoryMetaDTO 반환
-        return new HistoryMetaDTO(history.getId(), history.getName(), nextSequenceNumber);
     }
 
     private long validateRemainingMonthlyTokens(String memberId, Plan plan, String text){
@@ -262,13 +173,7 @@ public class SummaryService {
         return used;
     }
 
-    // ⭐ 쓰기 트랜잭션 - 사용량 업데이트
-    @Transactional
-    private void incrementMonthlyUsageTransactional(String memberId, String month, long increment) {
-        incrementMonthlyUsage(memberId, month, increment);
-    }
-
-    private void incrementMonthlyUsage (String memberId, String month, long increment){
+    private void incrementMonthlyUsage(String memberId, String month, long increment) {
         long after = tokenUsageService.incrementUsedTokens(memberId, month, increment);
         // 캐시 동기화(정합성 보장)
         redisService.incrementMonthlyUsage(memberId, month, increment);
@@ -280,8 +185,8 @@ public class SummaryService {
     public SummaryResponseDTO uploadFile(String memberId, MultipartFile file, String mode, String target, String question, Long historyId, Long folderId) {
         String text = "";
         // free 요금제 사용자는 사용 불가능
-        Member member = getMember(memberId);
-        Plan userPlan = Plan.fromId(member.getPlanId());
+        MemberRefDto memberRef = memberService.getMemberRef(memberId);
+        Plan userPlan = Plan.fromId(memberRef.getPlanId());
         if(userPlan == Plan.FREE){
             throw new BusinessLogicException(SummaryErrorCode.PLAN_NOT_ACCESSED);
         }
